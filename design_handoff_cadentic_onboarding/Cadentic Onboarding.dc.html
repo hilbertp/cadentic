@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#EDEAE2;font-family:"Instrument Sans",system-ui,sans-serif}a{color:#157D5F}a:hover{color:#0F5C46}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 "Instrument Sans",sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 "Instrument Sans",sans-serif;color:rgba(0,0,0,.55)}.dv-opt:target .dv-oid{background:#157D5F;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 "Instrument Sans",sans-serif;color:rgba(0,0,0,.5)}</style></helmet>
+
+<section style="padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,.08)">
+  <div style="font:700 15px 'Sora',sans-serif;letter-spacing:4px;color:#211E17">CADENTIC</div>
+  <div style="display:flex;gap:36px;flex-wrap:wrap;margin-top:14px;max-width:1180px">
+    <div style="flex:1;min-width:240px"><div style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:1px;color:rgba(0,0,0,.45);margin-bottom:6px">ASSUMPTIONS</div><div style="font:400 12.5px/1.55 'Instrument Sans',sans-serif;color:rgba(0,0,0,.7)">Persona: team-sport athlete (basketball), goals = dunk + elite endurance, longevity-first. Onboarding only (PRD §8, steps 1–4), ending at mesocycle approval. Deviation from PRD: step 2 is structured priorities/guardrails instead of a chat interview.</div></div>
+    <div style="flex:1;min-width:240px"><div style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:1px;color:rgba(0,0,0,.45);margin-bottom:6px">DIRECTION</div><div style="font:400 12.5px/1.55 'Instrument Sans',sans-serif;color:rgba(0,0,0,.7)">Calm longevity: warm neutrals, generous spacing, Sora + Instrument Sans, green accent #2FBF8F reserved for progress and CTAs. Coach-like copy. Light theme (dark parked for now).</div></div>
+    <div style="flex:1;min-width:240px"><div style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:1px;color:rgba(0,0,0,.45);margin-bottom:6px">OPEN QUESTION</div><div style="font:400 12.5px/1.55 'Instrument Sans',sans-serif;color:rgba(0,0,0,.7)">PRD leaves proposal modification undecided — the journey ships the timeline (<a href="#2c">2c</a>); the negotiation step is still to design.</div></div>
+  </div>
+</section>
+
+<section class="dv-turn" id="t5">
+<div class="dv-thd"><a class="dv-tid" href="#t5">5</a><span class="dv-tname">Onboarding journey — start to end (chosen path)</span></div>
+<div class="dv-opts" style="flex-wrap:nowrap">
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Step 1 · Baseline — who you are, where you train</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" bg="#F5F2EB" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;padding:10px 22px 20px;box-sizing:border-box;font-family:'Instrument Sans',sans-serif;color:#211E17">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 12px 'Sora',sans-serif;letter-spacing:3.5px">CADENTIC</span><span style="font:600 12px 'Sora',sans-serif;color:#6E6858">1 / 4</span></div>
+  <div style="display:flex;gap:6px;margin-top:12px"><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div></div>
+  <h1 style="font:600 26px/1.2 'Sora',sans-serif;margin:14px 0 6px">First, your baseline.</h1>
+  <p style="margin:0 0 14px;font-size:14.5px;line-height:1.5;color:#6E6858;text-wrap:pretty">Two minutes. Every number here shapes the program — nothing is cosmetic.</p>
+  <div style="display:flex;flex-direction:column;gap:11px">
+    <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:12px">
+      <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">AGE</div><div style="background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:13px 16px;font-size:15px;font-weight:500">27</div></div>
+      <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">SEX</div><div style="display:flex;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:3px;gap:3px"><div style="flex:1;text-align:center;padding:10px 0;border-radius:11px;background:rgba(47,191,143,.14);border:1.5px solid #2FBF8F;font-size:13.5px;font-weight:600;color:#157D5F">Male</div><div style="flex:1;text-align:center;padding:10px 0;border-radius:11px;font-size:13.5px;color:#6E6858">Female</div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">HEIGHT</div><div style="display:flex;justify-content:space-between;align-items:baseline;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:13px 16px"><span style="font-size:15px;font-weight:500">191</span><span style="font-size:12.5px;color:#6E6858">cm</span></div></div>
+      <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">WEIGHT</div><div style="display:flex;justify-content:space-between;align-items:baseline;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:13px 16px"><span style="font-size:15px;font-weight:500">88</span><span style="font-size:12.5px;color:#6E6858">kg</span></div></div>
+    </div>
+    <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">LOCATION</div><div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:13px 16px"><span style="font-size:15px;font-weight:500">Limassol, Cyprus</span><span style="font-size:12px;color:#6E6858">auto · edit</span></div></div>
+    <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">TRAINING EXPERIENCE</div><div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:13px 16px"><span style="font-size:15px;font-weight:500">6 years, consistent</span><span style="color:#6E6858;font-size:12px">▾</span></div></div>
+    <div><div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">CURRENT FITNESS — RATE OR SKIP</div>
+<div style="background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(33,30,23,.07)"><span style="flex:1;font-size:12.5px;font-weight:600">Cardio</span><span style="display:flex;gap:3px"><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">Low</span><span style="padding:4px 10px;border-radius:999px;background:rgba(47,191,143,.14);border:1.5px solid #2FBF8F;font-size:11px;font-weight:600;color:#157D5F">Mid</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">High</span></span><span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(33,30,23,.3);box-sizing:border-box"></span><span style="font-size:10.5px;color:#6E6858">don't care</span></span></div>
+  <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(33,30,23,.07)"><span style="flex:1;font-size:12.5px;font-weight:600">Strength</span><span style="display:flex;gap:3px"><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">Low</span><span style="padding:4px 10px;border-radius:999px;background:rgba(47,191,143,.14);border:1.5px solid #2FBF8F;font-size:11px;font-weight:600;color:#157D5F">Mid</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">High</span></span><span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(33,30,23,.3);box-sizing:border-box"></span><span style="font-size:10.5px;color:#6E6858">don't care</span></span></div>
+  <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(33,30,23,.07)"><span style="flex:1;font-size:12.5px;font-weight:600">Explosiveness</span><span style="display:flex;gap:3px"><span style="padding:4px 10px;border-radius:999px;background:rgba(47,191,143,.14);border:1.5px solid #2FBF8F;font-size:11px;font-weight:600;color:#157D5F">Low</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">Mid</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">High</span></span><span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(33,30,23,.3);box-sizing:border-box"></span><span style="font-size:10.5px;color:#6E6858">don't care</span></span></div>
+  <div style="display:flex;align-items:center;gap:8px;padding:9px 12px"><span style="flex:1;font-size:12.5px;font-weight:600;color:#6E6858">Hypertrophy</span><span style="display:flex;gap:3px;opacity:.45"><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">Low</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">Mid</span><span style="padding:4px 10px;border-radius:999px;border:1.5px solid rgba(0,0,0,0);background:rgba(33,30,23,.05);font-size:11px;color:#6E6858">High</span></span><span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:16px;border-radius:5px;background:#2FBF8F;color:#17352A;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">✓</span><span style="font-size:10.5px;font-weight:600;color:#157D5F">don't care</span></span></div>
+</div>
+<div style="font-size:11.5px;color:#6E6858;margin-top:6px;line-height:1.45">"Don't care" drops it as a goal — the plan may still touch it where it supports the rest.</div></div>
+  </div>
+  <div style="margin-top:auto">
+    <div style="background:#2FBF8F;color:#17352A;border-radius:999px;height:54px;display:flex;align-items:center;justify-content:center;font:600 15.5px 'Instrument Sans',sans-serif">Continue</div>
+  </div>
+</div>
+</x-import>
+</div>
+<div style="align-self:center;font:600 22px 'Sora',sans-serif;color:rgba(0,0,0,.3);padding:0 2px">→</div>
+<div class="dv-opt" id="6a">
+<div class="dv-olabel"><a class="dv-oid" href="#6a">6a</a>Step 2 · Priorities &amp; guardrails — structured, replaces the chat interview</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" bg="#F5F2EB" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;padding:10px 22px 20px;box-sizing:border-box;font-family:'Instrument Sans',sans-serif;color:#211E17">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 12px 'Sora',sans-serif;letter-spacing:3.5px">CADENTIC</span><span style="font:600 12px 'Sora',sans-serif;color:#6E6858">2 / 4</span></div>
+  <div style="display:flex;gap:6px;margin-top:12px"><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div></div>
+  <h1 style="font:600 24px/1.2 'Sora',sans-serif;margin:16px 0 6px">What matters, in order.</h1>
+  <p style="margin:0 0 14px;font-size:13.5px;line-height:1.5;color:#6E6858;text-wrap:pretty">Rank it, flag what's fragile, pick your lane. No essay needed.</p>
+  <div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin-bottom:6px">PRIORITIES — DRAG TO ORDER</div>
+  <div style="background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid rgba(33,30,23,.07)"><span style="display:flex;flex-direction:column;gap:2px"><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span></span><span style="width:20px;height:20px;border-radius:50%;background:rgba(33,30,23,.07);display:flex;align-items:center;justify-content:center;font:600 11px 'Sora',sans-serif">1</span><div style="flex:1"><div style="font-size:14px;font-weight:600">Endurance</div><div style="font-size:11.5px;color:#6E6858">aerobic engine</div></div><span style="background:rgba(47,191,143,.14);color:#157D5F;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600">this cycle</span></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px"><span style="display:flex;flex-direction:column;gap:2px"><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span></span><span style="width:20px;height:20px;border-radius:50%;background:rgba(33,30,23,.07);display:flex;align-items:center;justify-content:center;font:600 11px 'Sora',sans-serif">2</span><div style="flex:1"><div style="font-size:14px;font-weight:600">Explosiveness</div><div style="font-size:11.5px;color:#6E6858">vertical — the dunk</div></div><span style="background:rgba(47,191,143,.14);color:#157D5F;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600">this cycle</span></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(33,30,23,.03)"><span style="flex:1;height:1px;border-top:1.5px dashed rgba(33,30,23,.2)"></span><span style="font-size:10px;letter-spacing:1px;color:#6E6858;font-weight:600">FOCUS LINE — BELOW WAITS</span><span style="flex:1;height:1px;border-top:1.5px dashed rgba(33,30,23,.2)"></span></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;opacity:.55"><span style="display:flex;flex-direction:column;gap:2px"><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span><span style="width:12px;height:2px;background:rgba(33,30,23,.25);border-radius:1px"></span></span><span style="width:20px;height:20px;border-radius:50%;background:rgba(33,30,23,.07);display:flex;align-items:center;justify-content:center;font:600 11px 'Sora',sans-serif">3</span><div style="flex:1"><div style="font-size:14px;font-weight:600">Strength</div><div style="font-size:11.5px;color:#6E6858">base numbers hold</div></div><span style="background:rgba(33,30,23,.06);color:#6E6858;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600">later cycles</span></div>
+  </div>
+  <div style="font-size:11.5px;color:#6E6858;margin-top:6px;line-height:1.45">The top two get real attention now. A third dilutes all of them — Strength rejoins in a later cycle.</div>
+  <div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin:14px 0 6px">YOUR LANE</div>
+  <div style="display:flex;gap:8px">
+    <div style="flex:1;background:rgba(47,191,143,.14);border:1.5px solid #2FBF8F;border-radius:14px;padding:11px 13px"><div style="font-size:13.5px;font-weight:600;color:#157D5F">Longevity first</div><div style="font-size:11.5px;color:#157D5F;margin-top:3px;line-height:1.4">no red-zone weeks — adaptation compounds</div></div>
+    <div style="flex:1;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:11px 13px"><div style="font-size:13.5px;font-weight:600">Pure performance</div><div style="font-size:11.5px;color:#6E6858;margin-top:3px;line-height:1.4">maximal output, accepts wear</div></div>
+  </div>
+  <div style="font:600 11px 'Instrument Sans',sans-serif;letter-spacing:1.2px;color:#6E6858;margin:14px 0 6px">INJURIES &amp; LIMITATIONS</div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    <span style="display:flex;align-items:center;gap:7px;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:500">Lower-back disc (L4/L5)<span style="color:#6E6858;font-size:13px">×</span></span>
+    <span style="display:flex;align-items:center;gap:7px;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:500">Right ankle instability<span style="color:#6E6858;font-size:13px">×</span></span>
+    <span style="border:1.5px dashed rgba(33,30,23,.25);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:500;color:#6E6858">+ Add</span>
+  </div>
+  <div style="font-size:11.5px;color:#6E6858;margin-top:6px;line-height:1.45">Chronic, healing, or structural — the plan routes around these, permanently.</div>
+  <div style="margin-top:auto">
+    <div style="background:#2FBF8F;color:#17352A;border-radius:999px;height:52px;display:flex;align-items:center;justify-content:center;font:600 15.5px 'Instrument Sans',sans-serif">Continue</div>
+  </div>
+</div>
+</x-import>
+</div>
+<div style="align-self:center;font:600 22px 'Sora',sans-serif;color:rgba(0,0,0,.3);padding:0 2px">→</div>
+<div class="dv-opt" id="4b">
+<div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>Step 3 · Blockers &amp; standing conditions — 6-week horizon</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" bg="#F5F2EB" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;padding:10px 22px 20px;box-sizing:border-box;font-family:'Instrument Sans',sans-serif;color:#211E17">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 12px 'Sora',sans-serif;letter-spacing:3.5px">CADENTIC</span><span style="font:600 12px 'Sora',sans-serif;color:#6E6858">3 / 4</span></div>
+  <div style="display:flex;gap:6px;margin-top:12px"><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:rgba(33,30,23,.12)"></div></div>
+  <h1 style="font:600 25px/1.2 'Sora',sans-serif;margin:20px 0 6px">What must the plan respect?</h1>
+  <p style="margin:0 0 16px;font-size:13.5px;line-height:1.5;color:#6E6858;text-wrap:pretty">Practices repeat weekly. Games land where the league puts them.</p>
+  <div style="font:600 10.5px 'Instrument Sans',sans-serif;letter-spacing:1.4px;color:#6E6858;margin-bottom:8px">NEXT 6 WEEKS</div>
+  <div style="background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:12px 14px">
+    <div style="display:grid;grid-template-columns:34px repeat(7,1fr);gap:4px;align-items:center">
+      <span style="font-size:10px;color:#6E6858">wk</span>
+      <span style="font-size:10px;color:#6E6858;text-align:center">M</span><span style="font-size:10px;color:#6E6858;text-align:center">T</span><span style="font-size:10px;color:#6E6858;text-align:center">W</span><span style="font-size:10px;color:#6E6858;text-align:center">T</span><span style="font-size:10px;color:#6E6858;text-align:center">F</span><span style="font-size:10px;color:#6E6858;text-align:center">S</span><span style="font-size:10px;color:#6E6858;text-align:center">S</span>
+      <span style="font-size:10.5px;color:#6E6858">Aug 24</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:#C4513A"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span>
+      <span style="font-size:10.5px;color:#6E6858">Aug 31</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:#C4513A"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span>
+      <span style="font-size:10.5px;color:#6E6858">Sep 7</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span>
+      <span style="font-size:10.5px;color:#6E6858">Sep 14</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:#C4513A"></span>
+      <span style="font-size:10.5px;color:#6E6858">Sep 21</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span>
+      <span style="font-size:10.5px;color:#6E6858">Sep 28</span>
+      <span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span><span style="height:13px;border-radius:4px;border:1px solid #DE7B35;box-sizing:border-box"></span><span style="height:13px;border-radius:4px;background:#C4513A"></span><span style="height:13px;border-radius:4px;background:#C4513A"></span><span style="height:13px;border-radius:4px;background:rgba(33,30,23,.05)"></span>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:10px"><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6E6858"><span style="width:9px;height:9px;border-radius:3px;border:1px solid #DE7B35;box-sizing:border-box"></span>Practice · weekly</span><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6E6858"><span style="width:9px;height:9px;border-radius:3px;background:#C4513A"></span>Game · one-off</span></div>
+  </div>
+  <div style="font-size:12px;color:#6E6858;margin:9px 0 0;line-height:1.5">Two games one week, none the next, back-to-back in October — the engine plans each week around what's really there.</div>
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin:16px 0 8px"><span style="font:600 10.5px 'Instrument Sans',sans-serif;letter-spacing:1.4px;color:#6E6858">SOURCES</span></div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:12px 15px"><span style="width:9px;height:9px;border-radius:50%;background:#C4513A;flex-shrink:0"></span><div style="flex:1"><div style="font-size:14px;font-weight:600">Season schedule · 13 fixtures</div><div style="font-size:12.5px;color:#6E6858;margin-top:1px">Imported · league calendar · updates itself</div></div><span style="font-size:12px;font-weight:600;color:#157D5F">Manage</span></div>
+    <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:12px 15px"><span style="width:9px;height:9px;border-radius:50%;background:#DE7B35;flex-shrink:0"></span><div style="flex:1"><div style="font-size:14px;font-weight:600">Team practice</div><div style="font-size:12.5px;color:#6E6858;margin-top:1px">Every Tue &amp; Thu · 19:00–20:30 · Medium</div></div><span style="font-size:12px;font-weight:600;color:#157D5F">Edit</span></div>
+    <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid rgba(217,166,46,.5);border-radius:14px;padding:12px 15px"><span style="width:9px;height:9px;border-radius:50%;background:#D9A62E;flex-shrink:0"></span><div style="flex:1"><div style="font-size:14px;font-weight:600">August heat — Limassol</div><div style="font-size:12.5px;color:#6E6858;margin-top:1px">33° / dew 24° · not adapted · auto</div></div><span style="font-size:12px;font-weight:600;color:#157D5F">Edit</span></div>
+    <div style="border:1.5px dashed rgba(33,30,23,.25);border-radius:14px;padding:11px;text-align:center;font-size:13.5px;font-weight:500;color:#6E6858">+ Add one-off or recurring</div>
+  </div>
+  <div style="margin-top:auto">
+    <div style="background:#2FBF8F;color:#17352A;border-radius:999px;height:54px;display:flex;align-items:center;justify-content:center;font:600 15.5px 'Instrument Sans',sans-serif">Generate my mesocycle</div>
+  </div>
+</div>
+</x-import>
+</div>
+<div style="align-self:center;font:600 22px 'Sora',sans-serif;color:rgba(0,0,0,.3);padding:0 2px">→</div>
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Step 4 · Mesocycle proposal — heat-aware, review &amp; approve</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" bg="#F5F2EB" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;padding:10px 22px 20px;box-sizing:border-box;font-family:'Instrument Sans',sans-serif;color:#211E17">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 12px 'Sora',sans-serif;letter-spacing:3.5px">CADENTIC</span><span style="font:600 12px 'Sora',sans-serif;color:#6E6858">4 / 4</span></div>
+  <div style="display:flex;gap:6px;margin-top:12px"><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div><div style="flex:1;height:4px;border-radius:2px;background:#2FBF8F"></div></div>
+  <div style="font:600 10.5px 'Instrument Sans',sans-serif;letter-spacing:1.6px;color:#157D5F;margin:24px 0 6px">PROPOSAL — REVIEW &amp; APPROVE</div>
+  <h1 style="font:600 25px/1.2 'Sora',sans-serif;margin:0 0 6px">12 weeks, engine first.</h1>
+  <div style="font-size:13px;color:#6E6858;margin-bottom:12px">Aug 24 → Nov 15 · 5 sessions / wk · longevity-first</div>
+  <div style="display:flex;align-items:center;gap:8px;background:rgba(217,166,46,.13);border:1px solid rgba(217,166,46,.45);border-radius:12px;padding:10px 13px;margin-bottom:16px"><span style="width:8px;height:8px;border-radius:50%;background:#D9A62E;flex-shrink:0"></span><span style="font-size:12.5px;line-height:1.45;color:#211E17"><strong style="font-weight:600">Humid heat, not yet adapted</strong> — weeks 1–3 ramp exposure; key sessions 06:30 or pool.</span></div>
+  <div style="display:flex;gap:4px;height:46px">
+    <div style="flex:4;background:rgba(33,30,23,.07);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden"><span style="position:absolute;inset:0 auto 0 0;width:72%;background:repeating-linear-gradient(-55deg,rgba(217,166,46,.18) 0 5px,rgba(217,166,46,0) 5px 10px)"></span><span style="font-size:12px;font-weight:600;position:relative">Base</span><span style="font-size:10.5px;color:#6E6858;position:relative">wk 1–4</span></div>
+    <div style="flex:5;background:rgba(47,191,143,.18);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:12px;font-weight:600;color:#157D5F">Build</span><span style="font-size:10.5px;color:#157D5F">wk 5–9</span></div>
+    <div style="flex:2;background:rgba(47,191,143,.38);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:12px;font-weight:600;color:#0F5C46">Peak</span><span style="font-size:10.5px;color:#0F5C46">10–11</span></div>
+    <div style="flex:1.4;background:#fff;border:1.5px dashed #2FBF8F;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:11px;font-weight:600;color:#157D5F">Deload</span><span style="font-size:10.5px;color:#157D5F">12</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span style="width:22px;height:6px;border-radius:3px;background:repeating-linear-gradient(-55deg,rgba(217,166,46,.5) 0 4px,rgba(217,166,46,.12) 4px 8px)"></span><span style="font-size:10.5px;color:#6E6858">heat-acclimation ramp · wk 1–3</span></div>
+  <div style="font:600 10.5px 'Instrument Sans',sans-serif;letter-spacing:1.4px;color:#6E6858;margin:18px 0 8px">SESSION WINDOWS · AUGUST</div>
+  <div style="display:flex;gap:6px">
+    <div style="flex:1;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:12px;padding:10px 12px"><div style="font:600 15px 'Sora',sans-serif">06:30</div><div style="font-size:11px;color:#6E6858;margin-top:2px">hard sessions</div></div>
+    <div style="flex:1;background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:12px;padding:10px 12px"><div style="font:600 15px 'Sora',sans-serif">Pool</div><div style="font-size:11px;color:#6E6858;margin-top:2px">hot-day conditioning</div></div>
+    <div style="flex:1;background:#fff;border:1px solid rgba(196,81,58,.4);border-radius:12px;padding:10px 12px"><div style="font:600 15px 'Sora',sans-serif;color:#A33D28">10–18</div><div style="font-size:11px;color:#6E6858;margin-top:2px">no outdoor work</div></div>
+  </div>
+  <div style="background:#fff;border:1px solid rgba(33,30,23,.12);border-radius:14px;padding:12px 14px;margin-top:16px;font-size:13px;line-height:1.5"><strong style="font-weight:600;color:#157D5F">Coach's note.</strong> August in Limassol runs 33° with a 24° dew point, and you're starting cold on heat. So weeks 1–3 build your aerobic base <em style="font-style:normal;text-decoration:underline;text-underline-offset:2px">and</em> your sweat response at once — easy outdoor minutes early, hard work in water or AC. By late September the cap lifts and the build phase inherits a body that handles the island.</div>
+  <div style="margin-top:auto">
+    <div style="background:#2FBF8F;color:#17352A;border-radius:999px;height:54px;display:flex;align-items:center;justify-content:center;font:600 15.5px 'Instrument Sans',sans-serif">Approve mesocycle</div>
+    <div style="text-align:center;font-size:13.5px;font-weight:600;margin-top:12px;text-decoration:underline;text-underline-offset:3px">Ask for changes</div>
+  </div>
+</div>
+</x-import>
+</div>
+</div>
+<p class="dv-next">Try next: "prototype this flow as one clickable app" · "design what comes after approval — the week-1 home screen" · "make the conditions check its own step again"</p>
+</section>
+
+</x-dc>
+</body>
+</html>
