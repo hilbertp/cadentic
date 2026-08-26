@@ -1,7 +1,7 @@
 # Epic 1: Athlete Data Artifacts
 
 **Parent doc:** `design_handoff_cadentic_onboarding/cadentic_prd_v_1_1.md` (§5.2 artifacts, §6 inputs, §9 onboarding)
-**Status:** revised after implementor review — verdict *agree with changes*, all findings folded in; one question for the owner (bottom)
+**Status:** implemented (2026-08-26), then amended — the blocker calendar's third kind (`fixtures`) was dropped; see the sketch note. Revised after implementor review — verdict *agree with changes*, all findings folded in; the owner question is resolved and the open points are answered (both at the bottom).
 
 ## Goal
 
@@ -75,10 +75,10 @@ The PRD decomposes artifacts by *change cadence*, and the current code groups fi
 | `Profile.experience` | **athlete-status.json** | PRD §5.2 places experience in Status; stored as the label string for MVP |
 | `OnboardingDraft.injuries` | **athlete-status.json** | Free-text list, captured via chips on the Priorities screen |
 | `OnboardingDraft.priorities / focusCount / lane` + `dontCare` exclusions | **athlete-goals.json** | `dontCare` is a *goals* exclusion, not a status fact — even a rated category can be excluded |
-| `Constraints` (recurring, fixtures, one-offs, `fixtureSourceLabel`; stable `id`s) | **blocker-calendar.json** | Two identical-looking blockers must stay distinct (see `Model.kt` comment) — but the in-memory `Ids` counter resets per process, so durability needs a persisted high-water mark or UUID re-keying (story 4, open point 5) |
+| `Constraints` (recurring, one-offs; stable `id`s — `fixtures` and `fixtureSourceLabel` removed in the amendment below) | **blocker-calendar.json** | Two identical-looking blockers must stay distinct (see `Model.kt` comment) — but the in-memory `Ids` counter resets per process, so durability needs a persisted high-water mark or UUID re-keying (story 4, open point 5) |
 | — (new) | `athlete-goals.json → lockedForCycle` | Lock snapshot minted at approval from the in-memory `Proposal` (story 3) |
 | — (new) | **progression-log.json** | Schema defined now, initialized empty; written by the daily-tracking epic |
-| — (gap) | *(not captured)* | Free-text long-term goals (PRD §5.2 row 2): the shipped wizard captures ranked priorities + lane instead — **owner to confirm** this stands in for MVP (question at the bottom) |
+| — (gap) | *(not captured)* | Free-text long-term goals (PRD §5.2 row 2): the shipped wizard captures ranked priorities + lane instead — **owner confirmed** this stands in for MVP; PRD §5.2 and §9 carry the note |
 
 ### Artifact sketches
 
@@ -115,11 +115,17 @@ Every artifact carries `schemaVersion` and `updatedAt`.
 ```json
 // blocker-calendar.json — timeRange is OPAQUE free text (consumers must not
 // parse it); days serialized in canonical sorted order
-{ "schemaVersion": 1, "updatedAt": "…",
+//
+// AMENDED after implementation (2026-08-26, owner): the third kind — `fixtures`,
+// with `fixtureSourceLabel` — is GONE. It existed for an imported league schedule
+// that would stay authoritative on game dates; PRD §18 parks that import, so a
+// game day is just a one-off the athlete owns. Schema is now v2; v1 stores migrate
+// on read by folding fixtures into oneOffs. Stories 4 and 6 read accordingly:
+// wherever they say "all three blocker kinds", there are two.
+{ "schemaVersion": 2, "updatedAt": "…",
   "recurring": [ { "id": 1, "label": "Team practice", "days": ["TUESDAY","THURSDAY"], "timeRange": "19:00–20:30", "strain": "MEDIUM" } ],
-  "fixtures":  [ { "id": 2, "date": "2026-09-06", "label": "League game", "strain": "HARD" } ],
-  "fixtureSourceLabel": "…",
-  "oneOffs":   [ { "id": 3, "date": "2026-09-12", "label": "Travel day", "strain": "LIGHT" } ] }
+  "oneOffs":   [ { "id": 2, "date": "2026-09-06", "label": "League game", "strain": "HARD" },
+                 { "id": 3, "date": "2026-09-12", "label": "Travel day", "strain": "LIGHT" } ] }
 ```
 
 ```json
@@ -220,14 +226,16 @@ As an **athlete**, I want the app to load my persisted data on launch, so that a
 
 ---
 
-## Open points for the implementor
+## Open points for the implementor — answered
 
-1. Storage tech: JSON documents vs Room/DataStore — pick and record.
-2. Keep Kotlin domain classes as-is and map at serialization, or refactor `Profile` to match the artifact split?
-3. Where the goals lock is enforced (repository vs domain layer).
-4. Payload schema shape — flat composition vs nested per-artifact sections (nested presumed in the sketches) — and whether inert metadata (stable ids, `fixtureSourceLabel`) is stripped from the payload or passed through as declared-inert.
-5. Blocker id durability: persisted high-water mark vs UUID re-keying at the artifact boundary (story 4).
+1. **Storage tech: JSON documents.** One pretty-printed document per artifact in app-private storage, behind `ArtifactRepository`. The artifacts are whole documents, always read and written whole, a few kB each, and destined to become request bodies against a server — Room would buy querying nobody needs, DataStore/Proto would make the wire format harder to read during development. Recorded in `data/JsonArtifactRepository.kt`.
+2. **Domain classes stay as they are; the split happens at serialization**, in `domain/artifacts/ArtifactMapping.kt`. `Profile` holds UI strings and the self-assessment the PRD files under *Status*; refactoring it would have churned all four screens to move one map, and the artifact boundary is what is binding.
+3. **The goals lock is enforced in the repository.** It is the single write mechanism, so a caller that has never heard of the lock — a later engine, a migration, a sync — still cannot slip a change into an approved cycle.
+4. **Nested per-artifact sections, ids stripped, `fixtureSourceLabel` passed through.** Flat composition would lose the decomposition the PRD is built on and blur which store the Post-Mesocycle Review writes back to. Blocker ids are local storage handles that mean nothing to a planner and would invite the LLM to reference them; `fixtureSourceLabel` is real provenance about how firm those dates are. Per-artifact `schemaVersion`/`updatedAt` are dropped — the payload carries its own.
+5. **Blocker ids: persisted, with the `Ids` high-water mark re-seeded on load.** The artifact already carries every live id, so the mark needs no document of its own, and keeping `Long` ids leaves the UI's identity handling untouched. Ids of deleted blockers are never reused for a live one, because every surviving id is below the mark.
 
-## Open question for the product owner
+Three further calls the stories left open, recorded in `android/README.md`: the blocker calendar is rewritten on *every* forward transition rather than only from step 3 (story 0 permits rewriting all); **no step pointer is persisted**, so a restart mid-onboarding restores the data and resumes at step 1 prefilled, while an *approved* cycle skips onboarding entirely; and an unreadable store (newer `schemaVersion`, corrupt file) blocks writes for the session instead of being overwritten, with approval refusing outright rather than confirming a lock that was never written.
 
-- **Long-term goals as free text.** PRD §5.2 lists "long-term goals" ("I want to dunk") in the Athlete Goals artifact, from the conversational goal interview. The shipped onboarding captures ranked priorities + lane instead, so no free-text goals reach the artifact or the LLM payload. Confirm this stands in for MVP (the PRD then gets a note), or a free-text goals field must be added — which means a UI change outside this epic.
+## Open question for the product owner — resolved
+
+- **Long-term goals as free text.** PRD §5.2 lists "long-term goals" ("I want to dunk") in the Athlete Goals artifact, from the conversational goal interview. The shipped onboarding captures ranked priorities + lane instead, so no free-text goals reach the artifact or the LLM payload. **Owner confirmed (2026-08-26): ranked priorities + lane stand in for MVP.** PRD §5.2 and §9 now carry that note; no free-text goals field was added, and no UI change was needed.
