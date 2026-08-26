@@ -26,10 +26,14 @@ import com.cadentic.app.ui.theme.sans
 /**
  * Post-approval exit (onboarding ends here per PRD §8). The weekly overview
  * is the next milestone — this is a deliberate placeholder, not a designed screen.
+ *
+ * Reads [OnboardingViewModel.approvedSummary] rather than the in-memory proposal: after a
+ * restart the proposal is gone (the Mesocycle Plan is the next epic's artifact) but the
+ * goals lock is not, and the same three facts still render the same screen.
  */
 @Composable
 fun ApprovedScreen(vm: OnboardingViewModel) {
-    val proposal = vm.draft.proposal ?: return
+    val summary = vm.approvedSummary ?: return
     Column(
         Modifier.fillMaxSize().background(Ink.screenBg).padding(horizontal = 40.dp),
         verticalArrangement = Arrangement.Center,
@@ -43,9 +47,9 @@ fun ApprovedScreen(vm: OnboardingViewModel) {
         }
         Text("Mesocycle locked.", style = Type.h1(24.sp), modifier = Modifier.padding(top = 20.dp))
         Text(
-            "Base phase starts ${proposal.startDate.monthDay()}. " +
-                "This cycle: ${proposal.focusThisCycle.joinToString(" + ") { it.priorityTitle }}." +
-                (proposal.queuedForLater.takeIf { it.isNotEmpty() }
+            "Base phase starts ${summary.startDate.monthDay()}. " +
+                "This cycle: ${summary.focusThisCycle.joinToString(" + ") { it.priorityTitle }}." +
+                (summary.queuedForLater.takeIf { it.isNotEmpty() }
                     ?.let { " ${it.joinToString(", ") { c -> c.priorityTitle }} waits for the next one." } ?: ""),
             style = Type.intro(13.5.sp).copy(textAlign = TextAlign.Center),
             modifier = Modifier.padding(top = 8.dp),

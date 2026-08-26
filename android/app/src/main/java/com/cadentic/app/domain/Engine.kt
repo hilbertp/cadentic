@@ -49,10 +49,25 @@ object Seed {
     }
 }
 
-/** Process-wide monotonic ids. Constraints are identified by id, never by value. */
+/**
+ * Process-wide monotonic ids. Constraints are identified by id, never by value.
+ *
+ * The counter restarts at 0 with the process, so a persisted blocker calendar re-seeds it
+ * above its highest id on load ([seedAtLeast]) — otherwise a blocker created after a restart
+ * would collide with one already on disk and edits would hit the wrong row.
+ */
 object Ids {
     private var counter = 0L
     fun next(): Long = ++counter
+
+    fun seedAtLeast(highWaterMark: Long) {
+        if (highWaterMark > counter) counter = highWaterMark
+    }
+
+    /** Test hook: what process death does to the counter. */
+    internal fun resetForTests() {
+        counter = 0L
+    }
 }
 
 /** What actually sits on a given day. Ranked: a game outranks a one-off outranks practice. */

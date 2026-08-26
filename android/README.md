@@ -23,6 +23,15 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
     priorities are programmed per mesocycle, and the athlete may narrow that to a
     single focus (`focusCount` on the draft, chosen on step 2). Priorities change
     **between** cycles, never within one.
+  - `domain/Validation.kt` — the baseline step's accepted ranges, in the domain so the
+    UI's `stepValid()` and the artifact writer cannot drift apart.
+  - `domain/artifacts/` — the durable **athlete artifacts** (PRD §5.2) and the
+    meso-request payload. `Artifacts.kt` holds the schemas, `ArtifactMapping.kt`
+    the seam between the UI model and them, `ArtifactRepository.kt` the storage
+    interface, `MesoRequest.kt` the payload the Mesocycle Engine will send to the
+    LLM plus its completeness validation.
+  - `data/JsonArtifactRepository.kt` — one JSON document per artifact in app-private
+    storage, written atomically.
   - `domain/Engine.kt` — local stand-in for the server: persona seed data
     (13 imported fixtures, Tue/Thu practice), the 6-week horizon derivation, and
     the mesocycle proposal generator. `ProposalEngine.generate` is a pure local
@@ -68,3 +77,62 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
 - "Ask for changes" surfaces an honest snackbar — the negotiation flow is an
   open question in the PRD and deliberately unbuilt.
 - Light theme only, per the handoff.
+
+## Artifacts (Epic 1)
+
+Onboarding no longer holds the athlete's data only in memory. Every step writes
+durable artifacts, and the app hydrates from them on launch — kill the process and
+nothing is lost, and the future Mesocycle Engine reads artifacts, never UI state.
+
+| Artifact | Written when | Holds |
+|---|---|---|
+| `athlete-profile.json` | step 1 → 2 | age, sex, height, weight (numbers) |
+| `athlete-status.json` | step 1 → 2, step 2 → 3 | experience, per-category rating (`null` = skipped), injuries |
+| `athlete-goals.json` | step 2 → 3 (and any forward step after an edit) | lane, ordered priorities, effective focus count, excluded categories, `lockedForCycle` |
+| `blocker-calendar.json` | step 3 → generate | recurring blockers, fixtures, one-offs, strain, `fixtureSourceLabel` |
+| `progression-log.json` | at approval | empty; schema fixed for the daily-tracking epic |
+
+`MesoRequestAssembler.assemble(requestDate)` composes the first four into the
+**meso-request payload** — nested per-artifact sections plus an injected
+`requestDate` — and fails with an error naming the artifact and field rather than
+handing over a partial one.
+
+### Decisions taken here
+
+- **JSON documents, not Room or DataStore.** The artifacts are whole documents,
+  always read and written whole, a few kB each, and destined to become request
+  bodies against a server. No consumer queries them or updates them partially.
+- **The domain classes stay as they are; the artifact split happens at mapping.**
+  `Profile` holds UI strings and the self-assessment the PRD files under *Status*;
+  refactoring it would have churned all four screens to move one map.
+- **The goals lock is enforced in the repository.** It is the single write
+  mechanism, so a caller that has never heard of the lock still cannot change
+  priorities inside an approved cycle. The lock lives in the artifact, so a restart
+  does not reopen it.
+- **The payload is nested per artifact, with blocker ids stripped.** Ids are local
+  storage handles that mean nothing to a planner; `fixtureSourceLabel` is kept,
+  because it says how firm those dates are.
+- **Blocker ids: persisted, with the counter re-seeded on load.** The artifact
+  already carries every live id, so the high-water mark needs no document of its
+  own and `Long` ids stay as the UI knows them.
+- **Writes are synchronous.** Each is one small file replaced atomically, and an
+  approval must be durable before the athlete sees it confirmed.
+- **The step index is not persisted.** A restart mid-onboarding restores the data
+  and resumes at step 1 with the completed steps prefilled; nothing downstream
+  needs a step pointer. An *approved* cycle does skip onboarding entirely.
+- **An unreadable store is never overwritten.** An artifact from a newer build, or
+  a corrupt one, blocks writes for the session and surfaces a named message —
+  onboarding still runs in memory, and approval refuses rather than confirming a
+  lock that was not written.
+
+### Tests
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+JVM unit tests, no emulator. Process restart is simulated the way it actually
+happens — a fresh repository, a fresh ViewModel, and the process-wide `Ids`
+counter back at zero, with only the artifact directory surviving — so the
+restart, twin-blocker and lock-durability tests exercise the same code paths a
+real kill does.

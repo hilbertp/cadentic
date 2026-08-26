@@ -11,6 +11,7 @@ import com.cadentic.app.domain.Ids
 import com.cadentic.app.domain.Lane
 import com.cadentic.app.domain.OnboardingDraft
 import com.cadentic.app.domain.OneOffBlocker
+import com.cadentic.app.domain.ProfileRules
 import com.cadentic.app.domain.ProposalEngine
 import com.cadentic.app.domain.Rating
 import com.cadentic.app.domain.RecurringBlocker
@@ -19,34 +20,114 @@ import com.cadentic.app.domain.SelfAssessment
 import com.cadentic.app.domain.Sex
 import com.cadentic.app.domain.Status
 import com.cadentic.app.domain.Strain
+import com.cadentic.app.domain.artifacts.ArtifactError
+import com.cadentic.app.domain.artifacts.ArtifactException
+import com.cadentic.app.domain.artifacts.ArtifactRepository
+import com.cadentic.app.domain.artifacts.GoalsLock
+import com.cadentic.app.domain.artifacts.hydrateDraft
+import com.cadentic.app.domain.artifacts.reseedIds
+import com.cadentic.app.domain.artifacts.toConstraints
+import com.cadentic.app.domain.artifacts.toArtifact
+import com.cadentic.app.domain.artifacts.toGoalsArtifact
+import com.cadentic.app.domain.artifacts.toProfileArtifact
+import com.cadentic.app.domain.artifacts.toStatusArtifact
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 // Production generates server-side over ~20s; the local stub keeps the state visible but brief.
 private const val GENERATION_MS = 4200L
 
-class OnboardingViewModel : ViewModel() {
-
+class OnboardingViewModel(
+    private val repository: ArtifactRepository,
     // One clock read: the grid anchor and the seeded fixtures must agree even across midnight.
-    val today: LocalDate = LocalDate.now()
+    val today: LocalDate = LocalDate.now(),
+    private val clock: Clock = Clock.systemUTC(),
+) : ViewModel() {
 
-    var draft by mutableStateOf(OnboardingDraft(constraints = Seed.constraints(today)))
+    private val bootstrap: Bootstrap = loadFromArtifacts()
+
+    var draft by mutableStateOf(bootstrap.draft)
         private set
 
     // 1..4 = steps; generation is status GENERATING while on step 3→4 transition.
-    var step by mutableStateOf(1)
+    var step by mutableStateOf(bootstrap.step)
         private set
+
+    /** Present once a cycle is approved: goals are frozen until the next cycle (PRD §5.2). */
+    var goalsLock by mutableStateOf(bootstrap.lock)
+        private set
+
+    /**
+     * Set when the store holds something this build must not touch — an artifact written by
+     * a newer version, or a corrupt one. Onboarding still runs in memory, but nothing is
+     * written: overwriting would destroy the very data the error is about.
+     */
+    private var artifactsBlocked = bootstrap.error != null
 
     // Conflated: mid-drag boundary oscillation shows one brief snackbar, not a backlog.
     private val snackbars = Channel<String>(Channel.CONFLATED)
     val snackbarFlow = snackbars.receiveAsFlow()
 
     private var generationJob: Job? = null
+
+    init {
+        bootstrap.error?.let { toast("Saved data can't be read — ${it.message}") }
+    }
+
+    // --- Launch: hydrate from artifacts (story 7) -------------------------
+
+    private class Bootstrap(
+        val draft: OnboardingDraft,
+        val step: Int,
+        val lock: GoalsLock?,
+        val error: ArtifactError?,
+    )
+
+    /**
+     * Artifacts win over the seeded persona draft, field-group by field-group. The persona
+     * seed is only built when **no blocker-calendar artifact exists** — otherwise every
+     * launch would push a fresh set of fixtures into a calendar the athlete has already
+     * edited. A half-finished onboarding restores what was completed and leaves the rest at
+     * its defaults; the athlete resumes at step 1 with those steps prefilled (no step
+     * pointer is persisted — nothing downstream needs one).
+     */
+    private fun loadFromArtifacts(): Bootstrap {
+        val seeded = { OnboardingDraft(constraints = Seed.constraints(today)) }
+        return try {
+            val profile = repository.readProfile()
+            val status = repository.readStatus()
+            val goals = repository.readGoals()
+            val calendar = repository.readBlockerCalendar()
+
+            // Blocker ids must not restart at 0 alongside the process (story 4).
+            calendar?.reseedIds()
+
+            val fallback = calendar
+                ?.let { OnboardingDraft(constraints = it.toConstraints()) }
+                ?: seeded()
+            var hydrated = hydrateDraft(fallback, profile, status, goals, calendar)
+
+            val lock = goals?.lockedForCycle
+            if (lock != null) hydrated = hydrated.copy(status = Status.APPROVED)
+
+            Bootstrap(
+                draft = hydrated,
+                // An approved cycle skips onboarding entirely — the athlete lands where they
+                // left off, not back on step 1 with a locked cycle behind them.
+                step = if (lock != null) 4 else 1,
+                lock = lock,
+                error = null,
+            )
+        } catch (e: ArtifactException) {
+            Bootstrap(draft = seeded(), step = 1, lock = null, error = e.error)
+        }
+    }
 
     // --- Step 1: baseline -------------------------------------------------
 
@@ -104,6 +185,7 @@ class OnboardingViewModel : ViewModel() {
 
     // Every mutation below matches on the stable id. Matching on value would let two
     // look-alike blockers (same day, same label, same strain) be edited or deleted as one.
+    // Ids survive process death: they are persisted and the counter is re-seeded on launch.
 
     /** Correct how much a league game costs this athlete — the import stays authoritative on dates. */
     fun setFixtureStrain(id: Long, strain: Strain) = update {
@@ -156,13 +238,9 @@ class OnboardingViewModel : ViewModel() {
     // --- Navigation & generation ------------------------------------------
 
     fun stepValid(): Boolean = when (step) {
-        1 -> {
-            val p = draft.profile
-            p.age.toIntOrNull() in 14..90 && p.heightCm.toIntOrNull() in 120..230 &&
-                p.weightKg.toIntOrNull() in 35..250 &&
-                // At least one category must remain a goal.
-                p.assessment.values.any { !it.dontCare }
-        }
+        1 -> ProfileRules.baseDataValid(draft.profile) &&
+            // At least one category must remain a goal.
+            draft.profile.assessment.values.any { !it.dontCare }
         2 -> draft.priorities.isNotEmpty()
         else -> true
     }
@@ -171,6 +249,7 @@ class OnboardingViewModel : ViewModel() {
      *  transition (or a stale CTA on the outgoing screen) becomes a no-op. */
     fun continueFromStep(fromStep: Int) {
         if (fromStep != step || !stepValid()) return
+        persistArtifacts()
         when (step) {
             1, 2 -> step += 1
             3 -> generate()
@@ -190,6 +269,27 @@ class OnboardingViewModel : ViewModel() {
     fun approve() {
         // Locks the mesocycle: fixed once approved (PRD §5.1) — priorities only change between cycles.
         if (draft.status != Status.PROPOSED) return
+        val proposal = draft.proposal ?: return
+        if (artifactsBlocked) {
+            // Refusing beats confirming a lock that was never written.
+            toast("Can't approve — saved data is unreadable and must not be overwritten.")
+            return
+        }
+
+        // The lock must be durable *before* the athlete sees the confirmation, so this write
+        // is awaited and a failure leaves the proposal un-approved rather than confirming
+        // something process death could erase.
+        val committed = runArtifacts {
+            persistArtifacts(force = true)
+            goalsLock = repository.lockGoals(
+                GoalsLock(approvedAt = clock.instant(), startDate = proposal.startDate, endDate = proposal.endDate),
+            ).lockedForCycle
+            // The daily-tracking epic needs somewhere to write from day one (story 5).
+            // Never clobbers an existing log — a second cycle keeps its history.
+            repository.initializeProgressionLogIfAbsent()
+        }
+        if (!committed) return
+
         update { copy(status = Status.APPROVED) }
     }
 
@@ -213,6 +313,62 @@ class OnboardingViewModel : ViewModel() {
         }
         return false
     }
+
+    // --- Artifact writes (stories 1–5) ------------------------------------
+
+    /**
+     * The write rule: on every forward step transition and at approval, rewrite every
+     * artifact whose source fields could have changed. They are a few kB each, so all of
+     * them are rewritten rather than tracking dirty fields — which is also what makes
+     * back-then-forward edits correct: toggling a don't-care on step 1 after step 2 was
+     * completed reorders priorities, and the goals artifact reflects it on the way forward.
+     *
+     * A failed write on a step transition is surfaced and the athlete keeps moving; only
+     * approval refuses to proceed, because that is the one moment where a confirmation the
+     * athlete has seen must be backed by something on disk.
+     */
+    private fun persistArtifacts(force: Boolean = false) {
+        if (artifactsBlocked) return
+        val now = clock.instant()
+        val write = {
+            repository.writeProfile(draft.toProfileArtifact(now))
+            repository.writeStatus(draft.toStatusArtifact(now))
+            // Once locked, goals are refused by the repository too — this just avoids
+            // walking into an error the athlete can do nothing about.
+            if (goalsLock == null) repository.writeGoals(draft.toGoalsArtifact(now))
+            repository.writeBlockerCalendar(draft.constraints.toArtifact(now))
+        }
+        if (force) write() else runArtifacts(write)
+    }
+
+    /** Runs artifact work, turning a named failure into a snackbar. True when it committed. */
+    private fun runArtifacts(block: () -> Unit): Boolean = try {
+        block()
+        true
+    } catch (e: ArtifactException) {
+        toast("Couldn't save — ${e.error.message}")
+        false
+    }
+
+    // --- Post-approval summary --------------------------------------------
+
+    /**
+     * What the approved screen shows. Live from the proposal in the session that approved
+     * it; after a restart from the goals artifact alone — the Mesocycle Plan itself is the
+     * next epic's artifact, so nothing here invents plan detail that was not persisted.
+     */
+    data class ApprovedSummary(
+        val startDate: LocalDate,
+        val focusThisCycle: List<Category>,
+        val queuedForLater: List<Category>,
+    )
+
+    val approvedSummary: ApprovedSummary?
+        get() = draft.proposal?.let {
+            ApprovedSummary(it.startDate, it.focusThisCycle, it.queuedForLater)
+        } ?: goalsLock?.let {
+            ApprovedSummary(it.startDate, draft.focus, draft.queued)
+        }
 
     private fun update(block: OnboardingDraft.() -> OnboardingDraft) {
         draft = draft.block()
