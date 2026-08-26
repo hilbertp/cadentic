@@ -174,7 +174,7 @@ As an **athlete**, I want my ordered priorities, focus count, lane choice, and e
 **Acceptance criteria**
 - Artifact holds ordered priorities, the **effective** focus count (coerced to `1..min(MAX_FOCUS_COUNT, priorities.size)` — an impossible state can never be serialized), excluded (`dontCare`) categories, and lane.
 - Write points: step-2 completion; step-1 don't-care toggles that reorder priorities follow the story 0 write rule.
-- On mesocycle approval, `lockedForCycle` is set to a snapshot minted from the in-memory `Proposal` — `approvedAt`, `startDate`, `endDate`. (Full Mesocycle Plan persistence stays out of scope — next epic.)
+- On mesocycle approval, `lockedForCycle` is set to a snapshot — `approvedAt`, `startDate`, `endDate` — minted from the in-memory `Proposal` until Epic 2 lands, then **from the persisted `mesocycle-plan.json`** (Epic 2 story 4 fixes the write order: plan first, lock second; lock write is the commit point).
 - While locked, writes to the goals artifact are rejected with a named error.
 - No unlock path exists in this epic, and the locked state survives process restart — writes are still rejected after a restart.
 
