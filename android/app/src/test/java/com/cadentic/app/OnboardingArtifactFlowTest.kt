@@ -2,6 +2,7 @@ package com.cadentic.app
 
 import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Lane
+import com.cadentic.app.domain.MesocycleEngine
 import com.cadentic.app.domain.Status
 import com.cadentic.app.domain.Strain
 import com.cadentic.app.domain.artifacts.ArtifactError
@@ -38,7 +39,8 @@ class OnboardingArtifactFlowTest {
 
     private fun dir(): File = File(tmp.root, "artifacts")
     private fun repository(): ArtifactRepository = repositoryIn(dir())
-    private fun launchApp() = OnboardingViewModel(repository(), TODAY, FIXED_CLOCK)
+    private fun launchApp(engine: MesocycleEngine = engineReturning()) =
+        OnboardingViewModel(repository(), engine, TODAY, FIXED_CLOCK)
 
     @Before fun freshProcess() = Restart.simulate()
 
@@ -154,11 +156,14 @@ class OnboardingArtifactFlowTest {
 
         assertEquals(Status.APPROVED, relaunched.draft.status)
         assertEquals(4, relaunched.step)
-        // The proposal itself is gone — the Mesocycle Plan is the next epic — but the
-        // approved screen still renders from the lock and the goals artifact.
-        assertNull(relaunched.draft.proposal)
+        // Epic 2 story 4 changed this: the Mesocycle Plan is now an artifact, so a restart
+        // restores the whole cycle rather than only the dates the lock happened to carry.
+        val plan = relaunched.draft.plan!!
+        assertEquals(samplePlan().startDate, plan.startDate)
+        assertEquals(8, plan.durationWeeks)
+        assertEquals(4, relaunched.draft.proposal!!.phases.size)
         val summary = relaunched.approvedSummary!!
-        assertEquals(TODAY, summary.startDate)
+        assertEquals(samplePlan().startDate, summary.startDate)
         assertEquals(listOf(Category.CARDIO, Category.EXPLOSIVENESS), summary.focusThisCycle)
         assertEquals(listOf(Category.STRENGTH), summary.queuedForLater)
     }
@@ -170,9 +175,12 @@ class OnboardingArtifactFlowTest {
         val vm = launchApp()
         completeOnboarding(vm)
 
+        // Epic 2 story 4 amends where these dates come from: the lock is minted from the
+        // persisted Mesocycle Plan, not from an in-memory proposal the engine invented.
         val lock = vm.goalsLock!!
-        assertEquals(TODAY, lock.startDate)
-        assertEquals(TODAY.plusWeeks(12).minusDays(1), lock.endDate)
+        val plan = repository().readMesocyclePlan()!!
+        assertEquals(plan.startDate, lock.startDate)
+        assertEquals(plan.endDate, lock.endDate)
 
         Restart.simulate()
         assertNotNull(launchApp().goalsLock)
@@ -235,7 +243,7 @@ class OnboardingArtifactFlowTest {
                 override fun lockGoals(lock: GoalsLock): AthleteGoalsArtifact =
                     throw ArtifactException(ArtifactError.WriteFailed(ArtifactId.ATHLETE_GOALS, "disk full"))
             }
-            val vm = OnboardingViewModel(failing, TODAY, FIXED_CLOCK)
+            val vm = OnboardingViewModel(failing, engineReturning(), TODAY, FIXED_CLOCK)
             vm.continueFromStep(1)
             vm.continueFromStep(2)
             vm.continueFromStep(3)

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG ONLY (Epic 2 story 5).
+
+  The dev backend runs plain HTTP on a laptop, so debug builds need cleartext to reach it —
+  at 10.0.2.2 from the emulator, or at the machine's LAN address from a physical device.
+
+  This file and the manifest entry that points at it both live in `src/debug/`, so they are
+  physically absent from a release build. The permission cannot be shipped by forgetting a
+  flag: there is no flag, and there is no file. A release build talks to a TLS-terminated
+  engine, where `usesCleartextTraffic` stays false by platform default.
+
+  Cleartext is permitted broadly rather than per host because the dev host is a moving
+  target — emulator loopback, `adb reverse`, or whatever address the laptop got from DHCP
+  today — and the platform matches hostnames, not address ranges, so a private-range
+  allowlist would be a fiction that quietly failed on the next Wi-Fi network.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

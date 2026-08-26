@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      Generation is a call to the Mesocycle Engine backend (Epic 2 story 5). Cleartext to the
+      dev host is permitted by a network security config that exists only in `src/debug/`.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="Cadentic"
         android:icon="@mipmap/ic_launcher"

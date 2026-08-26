@@ -14,6 +14,24 @@ adb shell am start -n com.cadentic.app/.MainActivity
 Requires JDK 17 and the Android SDK (compileSdk 35). `local.properties` points at
 the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
 
+**Generation needs the backend running** (Epic 2). Start `../backend` first — see
+its README — then point the app at it:
+
+```bash
+./gradlew assembleDebug -Pcadentic.engineSharedSecret=<the backend's CADENTIC_SHARED_SECRET>
+```
+
+`cadentic.engineBaseUrl` defaults to `http://10.0.2.2:8787`, which is the
+emulator's alias for the host machine's loopback. On a physical device, pass the
+dev machine's LAN address and start the backend with a matching `HOST`:
+
+```bash
+./gradlew assembleDebug -Pcadentic.engineBaseUrl=http://192.168.1.42:8787 -Pcadentic.engineSharedSecret=<secret>
+```
+
+Both properties also work from `~/.gradle/gradle.properties` or `local.properties`,
+which is the less tedious place to keep them.
+
 ## Structure
 
 - `app/src/main/java/com/cadentic/app/`
@@ -33,17 +51,24 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
   - `data/JsonArtifactRepository.kt` — one JSON document per artifact in app-private
     storage, written atomically.
   - `domain/Engine.kt` — local stand-in for the server: persona seed data
-    (13 game days, Tue/Thu practice), the 6-week horizon derivation, and
-    the mesocycle proposal generator. `ProposalEngine.generate` is a pure local
-    stub — it does **not** call an LLM and builds no request payload. Swap it for
-    a real API call when the engine lands.
+    (13 game days, Tue/Thu practice) and the 6-week horizon derivation. The
+    local `ProposalEngine` stub that used to live here is gone — Epic 2 replaced
+    it with a real call behind `domain/MesocycleEngine.kt`.
+  - `domain/MesocycleEngine.kt` — the engine's domain boundary: a payload in, a
+    plan or a named `EngineError` out. The same seam the stub occupied, which is
+    why swapping it touched no screen.
+  - `domain/PlanNarrative.kt` — the proposal screen's words, composed from the
+    plan's structure. Nothing the model wrote is ever displayed (PRD §8).
+  - `data/HttpMesocycleEngine.kt` — the backend call. OkHttp +
+    kotlinx.serialization; no prompt and no provider credential live in the app.
   - `OnboardingViewModel.kt` — single draft state + step machine + all
     interaction rules (focus rule with snackbar, live don't-care propagation,
     cancellable generation, back navigation).
   - `ui/theme/Tokens.kt` — the handoff's design tokens (colors, Sora +
     Instrument Sans variable fonts, type scale).
-  - `ui/screens/` — one file per step, plus the generating and post-approval
-    screens (both intentionally minimal; undesigned in the handoff).
+  - `ui/screens/` — one file per step, plus the generating, generation-failed and
+    post-approval screens (all three intentionally minimal; undesigned in the
+    handoff).
 
 ## Deliberate choices
 
@@ -72,7 +97,9 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
   cells were a display-only swatch; making every day tappable meant they had to
   become a real calendar. Past days are dimmed and only open if something is
   already booked.
-- Generation is simulated locally (~4s; production spec says ~20s server-side).
+- Generation is a real call to the Mesocycle Engine backend (Epic 2). Multi-minute
+  waits are expected and the client timeout sits above the backend's own budget, so
+  a slow generation ends as a named `timeout` rather than a dropped socket.
 - "Ask for changes" surfaces an honest snackbar — the negotiation flow is an
   open question in the PRD and deliberately unbuilt.
 - Light theme only, per the handoff.
@@ -98,12 +125,14 @@ feed it — the PRD routes that to the History Engine and Mesocycle Tracker.
 
 ### The meso-request payload
 
-The contract the Mesocycle Engine will build its prompt from. Nested per artifact,
-ids stripped, `requestDate` injected at composition time:
+The contract the Mesocycle Engine builds its prompt from. Nested per artifact,
+ids stripped, `requestDate` injected at composition time. Epic 2 sends this
+verbatim as the request body — no envelope — and validates it against
+`../contracts/mesocycle-api.schema.json`:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "requestDate": "2026-08-26",
   "profile": { "age": 27, "sex": "MALE", "heightCm": 191, "weightKg": 88.0 },
   "goals": {
@@ -181,7 +210,140 @@ Rules a consumer can rely on:
   onboarding still runs in memory, and approval refuses rather than confirming a
   lock that was not written.
 
+## The Mesocycle Engine (Epic 2)
+
+Generation is no longer a local stub. Tapping **generate** assembles the
+meso-request payload from artifacts, posts it to the backend, and renders the
+plan Claude actually produced.
+
+```
+step 3 writes ──▶ MesoRequestAssembler ──▶ HttpMesocycleEngine ──▶ backend ──▶ Claude
+                                                                     │
+   ProposalScreen ◀── Proposal (derived) ◀── mesocycle-plan.json ◀────┘
+```
+
+The app holds **no** provider credential and builds **no** prompt. It posts the
+Epic 1 payload verbatim to one endpoint and gets back a plan the backend has
+already validated. Mode A versus Mode B is a backend config the app cannot see.
+
+### The Mesocycle Plan artifact
+
+`mesocycle-plan.json` — duration, phases, per-day types and intensities, and
+intra/inter-week progression. Never exercises: the mesocycle prescribes
+structure, and the daily layer, which knows about equipment and facilities,
+prescribes movement (PRD §5.1).
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-01T09:00:00Z",
+  "generatedBy": { "mode": "max-plan-oauth", "model": "claude-opus-5", "promptVersion": 1 },
+  "startDate": "2026-09-07", "endDate": "2026-11-01",
+  "durationWeeks": 8, "sessionsPerWeek": 5,
+  "lane": "LONGEVITY", "focus": ["CARDIO", "EXPLOSIVENESS"], "queued": ["STRENGTH"],
+  "phases": [
+    { "phaseType": "BASE", "name": "Base", "weeks": 3 },
+    { "phaseType": "BUILD", "name": "Build", "weeks": 3 },
+    { "phaseType": "DELOAD", "name": "Deload", "weeks": 1 },
+    { "phaseType": "PEAK", "name": "Peak", "weeks": 1 }
+  ],
+  "weeklyStructure": [
+    { "week": 1, "days": [{ "day": "MONDAY", "type": "STRENGTH", "intensity": "MEDIUM" }] }
+  ],
+  "progression": { "intraWeek": "…", "interWeek": "…" }
+}
+```
+
+Rules a consumer can rely on:
+
+- **`phaseType` is what you switch on.** `name` is display text the engine chose;
+  a plan that calls its first phase "Foundation" still colours as a BASE segment.
+- **Deload timing is a `DELOAD` phase**, not a separate field. One representation.
+- **`intensity` is `null` on a REST day and on no other day type.**
+- **Every week lists all seven days, Monday→Sunday.** A day off is REST, never an
+  omitted entry — so `sessionsPerWeek` is checkable against the weeks.
+- **`lane`, `focus` and `queued` are backend-stamped from the payload.** The model
+  echoes them so a contradiction is detectable, but the Goals artifact remains the
+  single source of truth for priorities.
+- **No `headline`, no `coachNote`.** Plan surfaces never render model free text
+  (PRD §8). `progression` is the only model prose in the artifact, and the
+  proposal screen does not show it — it is persisted for the daily layer.
+- **`updatedAt` is app-side.** The backend returns a plan; the repository records
+  when it wrote one.
+
+### Approval: plan first, then the lock
+
+On approval the write order is fixed, and the goals lock is minted from the plan
+**as read back off disk**:
+
+1. `mesocycle-plan.json`
+2. `athlete-goals.json → lockedForCycle`, from the persisted plan's dates
+3. `progression-log.json`, if it does not exist yet
+
+The lock is the commit point the UI awaits. A crash between 1 and 2 leaves an
+unapproved plan, never an approval with nothing behind it. *(This amends Epic 1
+story 3, where the lock came from the in-memory `Proposal`.)*
+
+**Half-state rule:** a plan with no lock is an abandoned attempt. It is not loaded
+on launch, the athlete lands back in the proposal flow, and the next generate
+deletes it. The reverse — a lock with no plan — can only come from a store written
+before this artifact existed; the lock still means approved, and the screen falls
+back to the dates it carries.
+
+### When generation fails
+
+`Status.FAILED` and an error slot on the draft, routed in `screenKey()` to a
+minimal screen with the reason and a retry. The screen is deliberately unpolished:
+like `GeneratingScreen`, it is undesigned in the handoff.
+
+Two failures that look alike and are not:
+
+| | Means | Fix |
+|---|---|---|
+| `BACKEND_UNREACHABLE` | The app never reached the backend | Connection, host, backend not running |
+| `PROVIDER_UNREACHABLE` | The backend could not reach Claude | Backend-side |
+
+Airplane mode exercises the first; blocking Claude with the backend up exercises
+the second.
+
+`back()` during GENERATING cancels the coroutine, which cancels the HTTP call,
+which closes the socket — and the backend, seeing nobody left waiting, aborts the
+generation. Walking away does not leave a plan being written for a screen no one
+is looking at. A generation cut short by process death leaves nothing behind at
+all: GENERATING is never persisted.
+
+### Decisions taken here
+
+- **OkHttp + kotlinx.serialization** (story 5 asks for the stack to be recorded).
+  OkHttp because generation is a multi-minute call the athlete can abandon and
+  `Call.cancel()` is a real cancellation; `HttpURLConnection` only offers
+  `disconnect()` from another thread. kotlinx.serialization because the artifacts
+  already use it, so the plan the engine returns and the plan written to disk
+  decode through one serializer. Retrofit/Moshi would add a second JSON library
+  and an interface layer over a single endpoint.
+- **The body is read inside the cancellable suspend, not after it.** The obvious
+  shape — suspend for the response, then read the body — leaves the cancellable
+  region as soon as the headers land, and the body read is *blocking*: a coroutine
+  cancelled there cannot reach a final state, so nothing fires to cancel the call.
+  Back would look instant while the request kept running.
+- **`headline` and `coachNote` are composed on the client** (open point 5). Either
+  side could do it deterministically; the tie-breaker is that wording is a display
+  concern — it belongs next to the screen that shows it, changes with design rather
+  than with the engine, and keeps the response a pure data contract.
+- **`Proposal` is derived, never stored.** `OnboardingDraft.proposal` is a computed
+  view over `plan`, so the two cannot disagree.
+- **The contract is a test resource, not a runtime dependency.** No JSON Schema
+  validator ships in the APK — kotlinx.serialization already rejects unknown keys
+  and bad enums. What it cannot catch is the two definitions drifting apart, and
+  that is what `ContractSchemaTest` runs against
+  `../contracts/mesocycle-api.schema.json` — the same file the backend validates
+  with at runtime.
+- **Cleartext is debug-only and file-scoped.** The network security config and the
+  manifest entry pointing at it both live in `src/debug/`, so they are physically
+  absent from a release build. There is no flag to forget.
+
 ### Tests
+
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -192,3 +354,12 @@ happens — a fresh repository, a fresh ViewModel, and the process-wide `Ids`
 counter back at zero, with only the artifact directory surviving — so the
 restart, twin-blocker and lock-durability tests exercise the same code paths a
 real kill does.
+
+Epic 2 adds four suites, none of which touch a network or an LLM:
+
+| Suite | Covers |
+|---|---|
+| `ContractSchemaTest` | The Kotlin types against the shared JSON Schema |
+| `MesocycleGenerationTest` | Generation, failure, retry, cancellation, the approval write order, the half-states |
+| `HttpMesocycleEngineTest` | The wire, over a real socket (MockWebServer): headers, body, every error code, cancellation |
+| `PlanNarrativeTest` | That the composed words are deterministic and track the plan |

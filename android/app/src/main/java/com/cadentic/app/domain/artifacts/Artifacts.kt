@@ -35,6 +35,13 @@ enum class ArtifactId(val fileName: String) {
     ATHLETE_STATUS("athlete-status.json"),
     BLOCKER_CALENDAR("blocker-calendar.json"),
     PROGRESSION_LOG("progression-log.json"),
+
+    /**
+     * The generated cycle (Epic 2 story 4). Versioned independently of the athlete artifacts
+     * — it is the engine's contract, defined in `contracts/mesocycle-api.schema.json`, not
+     * a PRD §5.2 athlete record — so it carries [MESOCYCLE_PLAN_SCHEMA_VERSION].
+     */
+    MESOCYCLE_PLAN("mesocycle-plan.json"),
 }
 
 // --- 1 · Athlete Profile -------------------------------------------------------------

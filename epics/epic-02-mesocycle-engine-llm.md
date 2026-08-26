@@ -2,7 +2,11 @@
 
 **Parent doc:** `design_handoff_cadentic_onboarding/cadentic_prd_v_1_1.md` (§5.3 Mesocycle Engine, §8 LLM integration, §9 step 4, §17)
 **Depends on:** Epic 1 (meso-request payload, story 6; payload shape — Epic 1 open point 4 — must be resolved first)
-**Status:** auth facts verified against official docs (2026-08-27); implementor-reviewed (3× *agree with changes*, all findings applied)
+**Status:** **implemented (2026-08-27)** — stories 0–5 built and tested; story 6 is the `provider-not-available` half only, as specified. Auth facts verified against official docs (2026-08-27); implementor-reviewed (3× *agree with changes*, all findings applied). Open points are answered at the bottom.
+
+**Where it lives:** `contracts/mesocycle-api.schema.json` (the shared contract), `backend/` (the engine), `android/app/src/main/java/com/cadentic/app/{domain/MesocycleEngine.kt,domain/PlanNarrative.kt,data/HttpMesocycleEngine.kt,domain/artifacts/MesocyclePlan.kt}`. Both READMEs carry the detail.
+
+**Not verified:** Mode A has never been run against a live subscription — that needs a `claude setup-token` the implementor cannot mint. Everything up to the provider seam is tested; the seam itself is exercised only by a fake.
 
 ## Goal
 
@@ -175,18 +179,83 @@ As a **user**, I want to enter my own Claude API key, so that my usage bills to 
 
 ---
 
-## Open points for the implementor
+## Open points for the implementor — answered
 
-1. Backend language (TypeScript vs Python) and hosting for the test phase (local dev machine reachable from the device is acceptable for MVP).
-2. Cancel-propagation vs idempotent request ids for abandoned generations (story 5).
-3. Mapping/extension of the Kotlin `Proposal` model to the response schema (per-day types, `phaseType`, derived `laneLabel`/`weeksLabel`).
-4. Model + effort config per mode (Mode A: Agent SDK model options; Mode B: default `claude-opus-5`).
-5. Where headline/coachNote composition lives (backend vs client — deterministic either way).
-6. `startDate` validity window (default 14 days).
+1. **Backend language and hosting: TypeScript, on the dev machine.** Both are Agent SDK
+   languages; TypeScript wins on JSON Schema tooling — Ajv compiles the shared contract
+   directly, so the file the app tests against is the file that validates at runtime, with no
+   translation layer. Node's built-in `http`, no framework: one endpoint and one health check
+   do not need a routing library. The dev server binds to loopback (emulator) or the LAN
+   address (device).
+2. **Abandoned generations: cancel propagation, with an in-flight join by request id.** Back
+   closes the socket and the generation goes with it — no orphaned request burning
+   subscription usage. The in-flight map covers the other half: a duplicate request id joins
+   the generation already running, so a double tap costs one generation. A generation is
+   aborted only once every waiter has gone. A deliberate retry mints a new id, because it
+   must actually generate again.
+3. **Mapping: `Proposal` became a derived view, and `Phase` gained `phaseType`.**
+   `OnboardingDraft.proposal` is now computed from `plan`, so the two cannot disagree. The UI
+   switches on `phaseType`; `laneLabel`, `weeksLabel`, `headline` and `coachNote` are all
+   client-derived and none are persisted. ProposalScreen is otherwise unchanged.
+4. **Model: `claude-opus-5`, configurable via `MESOCYCLE_MODEL`.** Planning around injuries,
+   fixtures and a lane is a reasoning task, and the plan is what the athlete's next two
+   months run on. Mode B will take its default from the same config.
+5. **Narrative composition lives on the client** (`PlanNarrative.kt`). Either side could do it
+   deterministically; the tie-breaker is that wording is a display concern — it belongs next
+   to the screen that shows it, changes with design rather than with the engine, and keeps
+   the response a pure data contract.
+6. **Start-date window: 14 days, tunable via `START_DATE_WINDOW_DAYS`.** A validity check: a
+   plan outside it is refused and re-requested, never moved.
 
-Note: Mode B routing is **backend-only**. A direct-from-app variant would duplicate the prompt template and validation client-side and break "A→B is a config swap" — it requires an owner decision, not an implementor one.
+Note: Mode B routing is **backend-only**. A direct-from-app variant would duplicate the prompt
+template and validation client-side and break "A→B is a config swap" — it requires an owner
+decision, not an implementor one.
+
+### Decisions the epic left open that the contract had to settle
+
+- **Request shape.** The body is the Epic 1 payload verbatim, with no envelope; the request id
+  travels in `X-Request-Id`. That keeps the bytes byte-identical to what the assembler
+  produced, so one JSON Schema covers both sides of the boundary.
+- **`sessionsPerWeek` vs `weeklyStructure`.** Defined as the *modal* per-week training-day
+  count, ties to the higher — "the typical week", which is what the UI label means, and which
+  a deload week legitimately sits below. The prompt states the rule in the same words the
+  validator uses.
+- **Every week lists all seven days**, Monday→Sunday, with a day off as `REST`. An omitted
+  entry would make the training-day count unverifiable.
+- **`intensity` is `null` on a REST day and on no other day type**, checked structurally.
+- **`unauthorized`** was added to the typed error set for the shared-secret refusal. It is not
+  a generation failure, but the app needed a name for it rather than a bare 401 body.
+- **`backend-unreachable` is deliberately absent from the wire contract.** It is minted
+  client-side and cannot arrive from a backend the app never reached.
+- **The lock survives a missing plan.** Story 4 asks hydration to route to the approved state
+  "with the persisted plan only when both writes exist". Read as written that would let a
+  deleted plan file un-approve a cycle the athlete really approved, so the qualifier is taken
+  to apply to *with the persisted plan*: the lock is the commit point and still means
+  approved, and the screen falls back to the dates the lock carries. The half-state the write
+  order can actually produce — a plan with no lock — is treated exactly as specified.
 
 ## Open questions for the product owner
 
-- Duration band: constrain the LLM to 4–16 weeks in the prompt? Out-of-band answer: reject-and-re-request, or accept? (PRD §18; story 1 proceeds bandless until answered.)
-- Long-term goals free text (carried from Epic 1): still unanswered; affects what the standard prompt can say about goals.
+- **Duration band:** constrain the LLM to 4–16 weeks in the prompt? Out-of-band answer:
+  reject-and-re-request, or accept? (PRD §18.) **Shipped bandless per your answer 5** — the
+  prompt says "There is no required range" and whatever duration comes back is accepted. The
+  schema's own 1–52 bound is a sanity limit, not a band. Answering this is a one-line prompt
+  change plus a `promptVersion` bump.
+- **Long-term goals free text** (carried from Epic 1): resolved in Epic 1 — ranked priorities
+  and the lane stand in for MVP, and the prompt says nothing about free-text goals because
+  the payload carries none.
+
+## Verifying it end to end
+
+Everything below the provider seam is covered by tests that never touch a network or an LLM
+(59 backend, 102 Android). What no test can cover is Mode A against a real subscription,
+because that needs a token only the owner can mint:
+
+1. `claude setup-token` on a machine with a browser; copy the printed token.
+2. `backend/.env`: `CLAUDE_CODE_OAUTH_TOKEN=<token>`, `MODE_A_PERSONAL_USE=true`,
+   `CADENTIC_SHARED_SECRET=$(openssl rand -hex 32)`. Do **not** set `ANTHROPIC_API_KEY`.
+3. `cd backend && npm install && npm run dev`
+4. `cd android && ./gradlew assembleDebug -Pcadentic.engineSharedSecret=<the same secret>`
+5. Install, run onboarding, tap generate.
+
+That walk is the epic's definition of done, and it is the one step still outstanding.

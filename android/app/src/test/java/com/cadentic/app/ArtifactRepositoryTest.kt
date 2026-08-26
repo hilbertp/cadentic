@@ -9,10 +9,12 @@ import com.cadentic.app.domain.artifacts.ARTIFACT_SCHEMA_VERSION
 import com.cadentic.app.domain.artifacts.ArtifactError
 import com.cadentic.app.domain.artifacts.ArtifactException
 import com.cadentic.app.domain.artifacts.ArtifactId
+import com.cadentic.app.domain.artifacts.DayType
 import com.cadentic.app.domain.artifacts.AthleteGoalsArtifact
 import com.cadentic.app.domain.artifacts.AthleteProfileArtifact
 import com.cadentic.app.domain.artifacts.AthleteStatusArtifact
 import com.cadentic.app.domain.artifacts.GoalsLock
+import com.cadentic.app.domain.artifacts.MESOCYCLE_PLAN_SCHEMA_VERSION
 import com.cadentic.app.domain.artifacts.highestId
 import com.cadentic.app.domain.artifacts.ProgressionEntry
 import com.cadentic.app.domain.artifacts.ProgressionLogArtifact
@@ -280,6 +282,69 @@ class ArtifactRepositoryTest {
         val status = repositoryIn(dir()).readStatus()!!
         assertTrue(status.selfAssessment.containsKey(Category.HYPERTROPHY))
         assertNull(status.selfAssessment[Category.HYPERTROPHY])
+    }
+
+    // --- The Mesocycle Plan artifact (Epic 2 story 4) ------------------------
+
+    @Test
+    fun `the plan round-trips through disk with its structure intact`() {
+        val repository = repositoryIn(dir())
+        repository.writeMesocyclePlan(samplePlan())
+
+        Restart.simulate()
+        val read = repositoryIn(dir()).readMesocyclePlan()!!
+        assertEquals(samplePlan().copy(updatedAt = read.updatedAt), read)
+        assertEquals(8, read.weeklyStructure.size)
+        assertEquals(7, read.weeklyStructure.first().days.size)
+        // A REST day's absent intensity is a fact, and it survives as null rather than
+        // being dropped from the document.
+        val rest = read.weeklyStructure.first().days.first { it.type == DayType.REST }
+        assertNull(rest.intensity)
+    }
+
+    @Test
+    fun `the repository stamps updatedAt, not the engine`() {
+        // The backend returns a plan with no updatedAt; when it was persisted is the app's
+        // fact to record, exactly as it is for every other artifact.
+        val repository = repositoryIn(dir())
+        assertNull(samplePlan().updatedAt)
+        repository.writeMesocyclePlan(samplePlan())
+        assertEquals(FIXED_CLOCK.instant(), repository.readMesocyclePlan()!!.updatedAt)
+    }
+
+    @Test
+    fun `the plan is versioned on its own contract, not the athlete artifacts'`() {
+        // MESOCYCLE_PLAN_SCHEMA_VERSION moves with the engine contract that defines the
+        // plan, and ARTIFACT_SCHEMA_VERSION moves with PRD §5.2's athlete records. Reading
+        // the plan must gate on its own version — not on whichever happens to be higher.
+        val repository = repositoryIn(dir())
+        repository.writeMesocyclePlan(samplePlan())
+        val file = File(dir(), ArtifactId.MESOCYCLE_PLAN.fileName)
+        file.writeText(
+            file.readText().replace(
+                "\"schemaVersion\": $MESOCYCLE_PLAN_SCHEMA_VERSION",
+                "\"schemaVersion\": ${MESOCYCLE_PLAN_SCHEMA_VERSION + 1}",
+            ),
+        )
+
+        val error = assertThrowsArtifactError { repositoryIn(dir()).readMesocyclePlan() }
+        val unsupported = error as ArtifactError.UnsupportedSchemaVersion
+        assertEquals(ArtifactId.MESOCYCLE_PLAN, unsupported.artifact)
+        assertEquals(MESOCYCLE_PLAN_SCHEMA_VERSION, unsupported.supported)
+    }
+
+    @Test
+    fun `deleting the plan is safe whether or not one exists`() {
+        val repository = repositoryIn(dir())
+        // An abandoned generation clears a plan that may never have been written.
+        repository.deleteMesocyclePlan()
+        assertNull(repository.readMesocyclePlan())
+
+        repository.writeMesocyclePlan(samplePlan())
+        assertNotNull(repository.readMesocyclePlan())
+        repository.deleteMesocyclePlan()
+        assertNull(repository.readMesocyclePlan())
+        assertTrue(!File(dir(), ArtifactId.MESOCYCLE_PLAN.fileName).exists())
     }
 
     private fun assertThrowsArtifactError(block: () -> Unit): ArtifactError {

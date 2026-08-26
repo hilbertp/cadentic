@@ -42,4 +42,17 @@ interface ArtifactRepository {
      * a second cycle's onboarding must never erase logged training.
      */
     fun initializeProgressionLogIfAbsent(): ProgressionLogArtifact
+
+    // --- Mesocycle Plan (Epic 2 story 4) ---------------------------------
+
+    fun readMesocyclePlan(): MesocyclePlanArtifact?
+
+    /**
+     * Written **before** the goals lock at approval. The lock is the commit point: a plan on
+     * disk without one is an unapproved plan, and the next generation overwrites it.
+     */
+    fun writeMesocyclePlan(plan: MesocyclePlanArtifact)
+
+    /** Clears an unapproved plan. Never called while a lock exists — see [lockGoals]. */
+    fun deleteMesocyclePlan()
 }

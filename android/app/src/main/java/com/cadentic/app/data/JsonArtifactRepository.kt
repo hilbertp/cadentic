@@ -9,6 +9,8 @@ import com.cadentic.app.domain.artifacts.AthleteProfileArtifact
 import com.cadentic.app.domain.artifacts.AthleteStatusArtifact
 import com.cadentic.app.domain.artifacts.BlockerCalendarArtifact
 import com.cadentic.app.domain.artifacts.GoalsLock
+import com.cadentic.app.domain.artifacts.MESOCYCLE_PLAN_SCHEMA_VERSION
+import com.cadentic.app.domain.artifacts.MesocyclePlanArtifact
 import com.cadentic.app.domain.artifacts.ProgressionLogArtifact
 import com.cadentic.app.domain.artifacts.raise
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -126,9 +128,43 @@ class JsonArtifactRepository(
         return empty
     }
 
+    // --- Mesocycle plan ---------------------------------------------------
+
+    override fun readMesocyclePlan(): MesocyclePlanArtifact? =
+        read(
+            ArtifactId.MESOCYCLE_PLAN,
+            MesocyclePlanArtifact.serializer(),
+            MESOCYCLE_PLAN_SCHEMA_VERSION,
+        )
+
+    override fun writeMesocyclePlan(plan: MesocyclePlanArtifact) =
+        write(
+            ArtifactId.MESOCYCLE_PLAN,
+            MesocyclePlanArtifact.serializer(),
+            // The backend returns a plan with no updatedAt; the stamp is a persistence fact,
+            // so it is applied here like it is for every other artifact.
+            plan.copy(updatedAt = now()),
+        )
+
+    override fun deleteMesocyclePlan() {
+        val f = file(ArtifactId.MESOCYCLE_PLAN)
+        if (f.exists() && !f.delete()) {
+            ArtifactError.WriteFailed(ArtifactId.MESOCYCLE_PLAN, "could not delete ${f.name}").raise()
+        }
+    }
+
     // --- Document I/O -----------------------------------------------------
 
-    private fun <T> read(id: ArtifactId, serializer: KSerializer<T>): T? {
+    /**
+     * [supportedVersion] is per artifact: the athlete artifacts share
+     * [ARTIFACT_SCHEMA_VERSION], while the Mesocycle Plan is versioned by the engine
+     * contract that defines it and moves on its own schedule.
+     */
+    private fun <T> read(
+        id: ArtifactId,
+        serializer: KSerializer<T>,
+        supportedVersion: Int = ARTIFACT_SCHEMA_VERSION,
+    ): T? {
         val f = file(id)
         if (!f.exists()) return null
         val text = try {
@@ -146,8 +182,8 @@ class JsonArtifactRepository(
         // this build would misread, so it is refused rather than partially understood.
         val version = (root["schemaVersion"]?.jsonPrimitive?.intOrNullSafe())
             ?: ArtifactError.MissingField(id, "schemaVersion").raise()
-        if (version > ARTIFACT_SCHEMA_VERSION) {
-            ArtifactError.UnsupportedSchemaVersion(id, version, ARTIFACT_SCHEMA_VERSION).raise()
+        if (version > supportedVersion) {
+            ArtifactError.UnsupportedSchemaVersion(id, version, supportedVersion).raise()
         }
         return try {
             json.decodeFromJsonElement(serializer, migrate(id, version, root))

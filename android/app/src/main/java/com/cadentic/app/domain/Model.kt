@@ -1,5 +1,6 @@
 package com.cadentic.app.domain
 
+import com.cadentic.app.domain.artifacts.PhaseType
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -77,9 +78,18 @@ data class Constraints(
     val oneOffs: List<OneOffBlocker> = emptyList(),
 )
 
-data class Phase(val name: String, val weeksLabel: String, val weeks: Int)
+/**
+ * A phase as the timeline draws it. [phaseType] is what the UI switches on — [name] is the
+ * engine's display text and may be anything, so colouring or dashing by it would break the
+ * moment a plan came back saying "Foundation" instead of "Base".
+ */
+data class Phase(val phaseType: PhaseType, val name: String, val weeksLabel: String, val weeks: Int)
 
-// Server-generated in production; stubbed locally by ProposalEngine.
+/**
+ * What the proposal screen renders: a view over the generated Mesocycle Plan, with
+ * `laneLabel`, `weeksLabel`, `headline` and `coachNote` composed on the client
+ * ([com.cadentic.app.domain.PlanNarrative]) rather than persisted or sent by the engine.
+ */
 data class Proposal(
     val startDate: LocalDate,
     val endDate: LocalDate,
@@ -94,7 +104,11 @@ data class Proposal(
     val queuedForLater: List<Category>,
 )
 
-enum class Status { DRAFT, GENERATING, PROPOSED, APPROVED }
+/**
+ * [FAILED] arrived with Epic 2: generation is a network call now, and a call that fails needs
+ * somewhere to land other than a silent slide back to DRAFT with no explanation.
+ */
+enum class Status { DRAFT, GENERATING, PROPOSED, FAILED, APPROVED }
 
 // Never more than two priorities per cycle; one is a valid — and sharper — choice.
 const val MAX_FOCUS_COUNT = 2
@@ -110,9 +124,18 @@ data class OnboardingDraft(
     val lane: Lane = Lane.LONGEVITY,
     val injuries: List<String> = listOf("Lower-back disc (L4/L5)", "Right ankle instability"),
     val constraints: Constraints,
-    val proposal: Proposal? = null,
+    /** The generated cycle, once the engine has returned one. Persisted only at approval. */
+    val plan: com.cadentic.app.domain.artifacts.MesocyclePlanArtifact? = null,
     val status: Status = Status.DRAFT,
+    /** Set with [Status.FAILED] and cleared on every new attempt. Why the last one failed. */
+    val generationError: EngineError? = null,
 ) {
+    /**
+     * Derived, never stored: the proposal screen's view of [plan]. Keeping it computed means
+     * the two can't disagree — there is no second copy to forget to update.
+     */
+    val proposal: Proposal? get() = plan?.toProposal(constraints)
+
     /** Clamped to what actually exists — a single priority can only ever be a single focus. */
     val effectiveFocusCount: Int
         get() = focusCount.coerceIn(1, maxOf(1, minOf(MAX_FOCUS_COUNT, priorities.size)))

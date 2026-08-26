@@ -28,17 +28,21 @@ import com.cadentic.app.domain.Status
 import com.cadentic.app.ui.screens.ApprovedScreen
 import com.cadentic.app.ui.screens.BaselineScreen
 import com.cadentic.app.ui.screens.BlockersScreen
+import com.cadentic.app.ui.screens.GenerationFailedScreen
 import com.cadentic.app.ui.screens.GeneratingScreen
 import com.cadentic.app.ui.screens.PrioritiesScreen
 import com.cadentic.app.ui.screens.ProposalScreen
 import com.cadentic.app.ui.theme.Ink
 import com.cadentic.app.ui.theme.sans
 
-// Ordinal per screen so transitions know which way to slide.
+// Ordinal per screen so transitions know which way to slide. FAILED sits past the spinner:
+// generation ended, so it slides in forwards like the proposal would have, and returning to
+// step 3 slides back.
 private fun screenKey(vm: OnboardingViewModel): Int = when {
     vm.draft.status == Status.APPROVED -> 6
     vm.draft.status == Status.GENERATING -> 4
     vm.draft.status == Status.PROPOSED && vm.step == 4 -> 5
+    vm.draft.status == Status.FAILED && vm.step == 4 -> 7
     else -> vm.step
 }
 
@@ -71,6 +75,7 @@ fun OnboardingApp(vm: OnboardingViewModel) {
                 3 -> BlockersScreen(vm)
                 4 -> GeneratingScreen()
                 5 -> ProposalScreen(vm)
+                7 -> GenerationFailedScreen(vm)
                 else -> ApprovedScreen(vm)
             }
         }

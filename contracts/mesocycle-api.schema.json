@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadentic.app/contracts/mesocycle-api.schema.json",
+  "title": "Cadentic Mesocycle Engine API",
+  "description": "The single contract for POST /v1/mesocycle-proposal (Epic 2 story 0). Request, response, the LLM's answer, and every enum are defined here once: the backend compiles these subschemas with Ajv at runtime, and the Android app's ContractSchemaTest asserts its Kotlin types still agree with them. Nothing in this file is hand-mirrored on either side.",
+
+  "$defs": {
+    "Category": {
+      "description": "A trainable quality the athlete ranks in onboarding. Mirrors com.cadentic.app.domain.Category.",
+      "enum": ["CARDIO", "STRENGTH", "EXPLOSIVENESS", "HYPERTROPHY"]
+    },
+    "Lane": {
+      "description": "How much wear the athlete accepts. Mirrors com.cadentic.app.domain.Lane.",
+      "enum": ["LONGEVITY", "PERFORMANCE"]
+    },
+    "Rating": {
+      "description": "A self-assessed level. null (not this enum) means the athlete skipped the question — unknown, never average.",
+      "enum": ["LOW", "MID", "HIGH"]
+    },
+    "Sex": {
+      "enum": ["MALE", "FEMALE"]
+    },
+    "Strain": {
+      "description": "How hard a blocker is on the athlete. Mirrors com.cadentic.app.domain.Strain.",
+      "enum": ["LIGHT", "MEDIUM", "HARD"]
+    },
+    "DayOfWeek": {
+      "enum": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    },
+    "DayType": {
+      "description": "What a planned day is for. Pinned to PRD §5.1. Game and team-practice days are NOT in this enum: the GUI overlays those from the Blocker Calendar, and the model never authors them.",
+      "enum": ["STRENGTH", "ENDURANCE", "MOBILITY", "RECOVERY", "REST"]
+    },
+    "Intensity": {
+      "description": "Reuses the Strain vocabulary so the product speaks one intensity language. null on — and only on — a REST day.",
+      "enum": ["LIGHT", "MEDIUM", "HARD"]
+    },
+    "PhaseType": {
+      "description": "The phase's role, which the UI switches on. Deload timing is expressed as a DELOAD phase; there is no separate deload field.",
+      "enum": ["BASE", "BUILD", "PEAK", "DELOAD"]
+    },
+    "IsoDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+
+    "MesoRequestPayload": {
+      "description": "The request body: exactly what Epic 1's MesoRequestAssembler produces, sent verbatim. The request id travels in the X-Request-Id header, not here, so the body stays byte-identical to the assembled payload.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "requestDate", "profile", "goals", "status", "blockerCalendar"],
+      "properties": {
+        "schemaVersion": { "type": "integer", "const": 2 },
+        "requestDate": {
+          "$ref": "#/$defs/IsoDate",
+          "description": "The temporal anchor, injected by the assembler. The cycle is calendar-anchored and one-off blockers carry absolute dates."
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["age", "sex", "heightCm", "weightKg"],
+          "properties": {
+            "age": { "type": "integer", "minimum": 14, "maximum": 90 },
+            "sex": { "$ref": "#/$defs/Sex" },
+            "heightCm": { "type": "integer", "minimum": 120, "maximum": 230 },
+            "weightKg": { "type": "number", "minimum": 35, "maximum": 250 }
+          }
+        },
+        "goals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lane", "priorities", "focusCount", "focusThisCycle", "queuedForLater", "excluded"],
+          "properties": {
+            "lane": { "$ref": "#/$defs/Lane" },
+            "priorities": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Category" },
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true
+            },
+            "focusCount": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "focusThisCycle": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Category" },
+              "minItems": 1,
+              "maxItems": 2,
+              "uniqueItems": true
+            },
+            "queuedForLater": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Category" },
+              "maxItems": 3,
+              "uniqueItems": true
+            },
+            "excluded": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Category" },
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          }
+        },
+        "status": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["experience", "selfAssessment", "injuries"],
+          "properties": {
+            "experience": { "type": "string", "minLength": 1 },
+            "selfAssessment": {
+              "description": "All four categories are always present as keys. A null value means unknown, not average.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["CARDIO", "STRENGTH", "EXPLOSIVENESS", "HYPERTROPHY"],
+              "properties": {
+                "CARDIO": { "oneOf": [{ "$ref": "#/$defs/Rating" }, { "type": "null" }] },
+                "STRENGTH": { "oneOf": [{ "$ref": "#/$defs/Rating" }, { "type": "null" }] },
+                "EXPLOSIVENESS": { "oneOf": [{ "$ref": "#/$defs/Rating" }, { "type": "null" }] },
+                "HYPERTROPHY": { "oneOf": [{ "$ref": "#/$defs/Rating" }, { "type": "null" }] }
+              }
+            },
+            "injuries": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "blockerCalendar": {
+          "description": "Two kinds and only two. A league game is a one-off like any other; there is no fixture kind and no schedule import behind one. An empty calendar is valid.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recurring", "oneOffs"],
+          "properties": {
+            "recurring": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "days", "timeRange", "strain"],
+                "properties": {
+                  "label": { "type": "string", "minLength": 1 },
+                  "days": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/DayOfWeek" },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "timeRange": {
+                    "type": "string",
+                    "description": "OPAQUE free text (\"19:00–20:30\"). Consumers — the model included — must not parse it."
+                  },
+                  "strain": { "$ref": "#/$defs/Strain" }
+                }
+              }
+            },
+            "oneOffs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["date", "label", "strain"],
+                "properties": {
+                  "date": { "$ref": "#/$defs/IsoDate" },
+                  "label": { "type": "string", "minLength": 1 },
+                  "strain": { "$ref": "#/$defs/Strain" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "Phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phaseType", "name", "weeks"],
+      "properties": {
+        "phaseType": { "$ref": "#/$defs/PhaseType" },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "description": "Display text only. The UI switches on phaseType, never on this."
+        },
+        "weeks": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+
+    "PlannedDay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["day", "type", "intensity"],
+      "properties": {
+        "day": { "$ref": "#/$defs/DayOfWeek" },
+        "type": { "$ref": "#/$defs/DayType" },
+        "intensity": {
+          "oneOf": [{ "$ref": "#/$defs/Intensity" }, { "type": "null" }],
+          "description": "null on a REST day and on no other day type — checked structurally, not just here."
+        }
+      }
+    },
+
+    "PlannedWeek": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["week", "days"],
+      "properties": {
+        "week": { "type": "integer", "minimum": 1 },
+        "days": {
+          "description": "All seven days, in Monday→Sunday order. A day the athlete does not train is REST, never an omitted entry.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedDay" },
+          "minItems": 7,
+          "maxItems": 7
+        }
+      }
+    },
+
+    "Progression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intraWeek", "interWeek"],
+      "properties": {
+        "intraWeek": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "interWeek": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+
+    "PlanDraft": {
+      "description": "What the model must return, and the schema handed to the Agent SDK's json_schema output format. Deliberately absent: exercises of any kind (machine-enforced by DayType plus additionalProperties:false), and headline/coachNote — plan surfaces never render model free text (PRD §8), so those stay deterministically composed on the client. lane/focus/queued ARE required here so a contradiction with the request is detectable; the backend then stamps its own values over them regardless.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startDate", "endDate", "durationWeeks", "sessionsPerWeek",
+        "lane", "focus", "queued", "phases", "weeklyStructure", "progression"
+      ],
+      "properties": {
+        "startDate": { "$ref": "#/$defs/IsoDate" },
+        "endDate": { "$ref": "#/$defs/IsoDate" },
+        "durationWeeks": { "type": "integer", "minimum": 1, "maximum": 52 },
+        "sessionsPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+        "lane": { "$ref": "#/$defs/Lane" },
+        "focus": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Category" },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "queued": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Category" },
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Phase" },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "weeklyStructure": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedWeek" },
+          "minItems": 1,
+          "maxItems": 52
+        },
+        "progression": { "$ref": "#/$defs/Progression" }
+      }
+    },
+
+    "GeneratedBy": {
+      "description": "Backend-stamped provenance. The app persists it so a plan can always be traced to the mode, model and prompt that produced it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "model", "promptVersion"],
+      "properties": {
+        "mode": {
+          "enum": ["max-plan-oauth", "user-api-key"],
+          "description": "max-plan-oauth = Mode A (Agent SDK on the owner's subscription); user-api-key = Mode B."
+        },
+        "model": { "type": "string", "minLength": 1 },
+        "promptVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "MesocyclePlan": {
+      "description": "The 200 response body, and — once the app adds updatedAt — the mesocycle-plan.json artifact. Everything the model authored, with schemaVersion, generatedBy, lane, focus and queued stamped by the backend.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "generatedBy",
+        "startDate", "endDate", "durationWeeks", "sessionsPerWeek",
+        "lane", "focus", "queued", "phases", "weeklyStructure", "progression"
+      ],
+      "properties": {
+        "schemaVersion": { "type": "integer", "const": 1 },
+        "generatedBy": { "$ref": "#/$defs/GeneratedBy" },
+        "startDate": { "$ref": "#/$defs/IsoDate" },
+        "endDate": { "$ref": "#/$defs/IsoDate" },
+        "durationWeeks": { "type": "integer", "minimum": 1, "maximum": 52 },
+        "sessionsPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+        "lane": { "$ref": "#/$defs/Lane" },
+        "focus": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Category" },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "queued": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Category" },
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Phase" },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "weeklyStructure": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedWeek" },
+          "minItems": 1,
+          "maxItems": 52
+        },
+        "progression": { "$ref": "#/$defs/Progression" }
+      }
+    },
+
+    "ErrorCode": {
+      "description": "The complete set the app may receive from the backend. backend-unreachable is deliberately absent: that one is minted client-side when the app cannot reach the backend at all, and never travels over the wire.",
+      "enum": [
+        "payload-invalid",
+        "unauthorized",
+        "provider-not-available",
+        "provider-unreachable",
+        "rate-limited",
+        "timeout",
+        "format-failed",
+        "auth-failed"
+      ]
+    },
+
+    "ErrorResponse": {
+      "description": "Every non-2xx response. Named, never a stack trace.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "$ref": "#/$defs/ErrorCode" },
+            "message": {
+              "type": "string",
+              "description": "Safe to show or log. Never carries provider internals, tokens, or a stack trace."
+            },
+            "retryAfterSeconds": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Present on rate-limited when the provider told us how long to wait."
+            },
+            "fields": {
+              "description": "Present on payload-invalid: the named field errors, in Epic 1 story 6's style.",
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

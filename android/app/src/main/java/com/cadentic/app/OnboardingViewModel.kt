@@ -6,13 +6,16 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cadentic.app.domain.Category
+import com.cadentic.app.domain.EngineError
 import com.cadentic.app.domain.MAX_FOCUS_COUNT
 import com.cadentic.app.domain.Ids
 import com.cadentic.app.domain.Lane
+import com.cadentic.app.domain.MesocycleEngine
+import com.cadentic.app.domain.MesocycleRequest
+import com.cadentic.app.domain.MesocycleResult
 import com.cadentic.app.domain.OnboardingDraft
 import com.cadentic.app.domain.OneOffBlocker
 import com.cadentic.app.domain.ProfileRules
-import com.cadentic.app.domain.ProposalEngine
 import com.cadentic.app.domain.Rating
 import com.cadentic.app.domain.RecurringBlocker
 import com.cadentic.app.domain.Seed
@@ -22,9 +25,13 @@ import com.cadentic.app.domain.Status
 import com.cadentic.app.domain.Strain
 import com.cadentic.app.domain.artifacts.ArtifactError
 import com.cadentic.app.domain.artifacts.ArtifactException
+import com.cadentic.app.domain.artifacts.ArtifactId
 import com.cadentic.app.domain.artifacts.ArtifactRepository
 import com.cadentic.app.domain.artifacts.GoalsLock
+import com.cadentic.app.domain.artifacts.MesoRequestAssembler
+import com.cadentic.app.domain.artifacts.MesoRequestResult
 import com.cadentic.app.domain.artifacts.hydrateDraft
+import com.cadentic.app.domain.artifacts.raise
 import com.cadentic.app.domain.artifacts.reseedIds
 import com.cadentic.app.domain.artifacts.toConstraints
 import com.cadentic.app.domain.artifacts.toArtifact
@@ -33,18 +40,21 @@ import com.cadentic.app.domain.artifacts.toProfileArtifact
 import com.cadentic.app.domain.artifacts.toStatusArtifact
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
-
-// Production generates server-side over ~20s; the local stub keeps the state visible but brief.
-private const val GENERATION_MS = 4200L
+import java.util.UUID
 
 class OnboardingViewModel(
     private val repository: ArtifactRepository,
+    /**
+     * The Mesocycle Engine (Epic 2 story 5). An interface, not the HTTP client: the ViewModel
+     * has never known where a proposal comes from, and that is what let the local stub be
+     * swapped for a real generation without touching the screens.
+     */
+    private val engine: MesocycleEngine,
     // One clock read: the grid anchor and the seeded game days must agree even across midnight.
     val today: LocalDate = LocalDate.now(),
     private val clock: Clock = Clock.systemUTC(),
@@ -96,6 +106,16 @@ class OnboardingViewModel(
      * edited. A half-finished onboarding restores what was completed and leaves the rest at
      * its defaults; the athlete resumes at step 1 with those steps prefilled (no step
      * pointer is persisted — nothing downstream needs one).
+     *
+     * **The goals lock decides approval; the plan decides how much the approved screen can
+     * say** (Epic 2 story 4). The write order is plan-then-lock, so a lock always had a plan
+     * under it — and the lock is the commit point, so its presence alone means approved. The
+     * reverse half-state is the one the order can actually produce: a plan with no lock is an
+     * abandoned generation, so it is not loaded, the athlete lands back in the proposal flow,
+     * and the next generate deletes it.
+     *
+     * A generation cut short by process death leaves nothing behind at all — GENERATING is
+     * never persisted — so the athlete comes back to their data with nothing half-approved.
      */
     private fun loadFromArtifacts(): Bootstrap {
         val seeded = { OnboardingDraft(constraints = Seed.constraints(today)) }
@@ -114,7 +134,12 @@ class OnboardingViewModel(
             var hydrated = hydrateDraft(fallback, profile, status, goals, calendar)
 
             val lock = goals?.lockedForCycle
-            if (lock != null) hydrated = hydrated.copy(status = Status.APPROVED)
+            if (lock != null) {
+                hydrated = hydrated.copy(
+                    status = Status.APPROVED,
+                    plan = repository.readMesocyclePlan(),
+                )
+            }
 
             Bootstrap(
                 draft = hydrated,
@@ -238,42 +263,103 @@ class OnboardingViewModel(
      *  transition (or a stale CTA on the outgoing screen) becomes a no-op. */
     fun continueFromStep(fromStep: Int) {
         if (fromStep != step || !stepValid()) return
-        persistArtifacts()
+        val persisted = persistArtifacts()
         when (step) {
             1, 2 -> step += 1
-            3 -> generate()
+            // Generation reads artifacts, so it must not start until step 3's writes have
+            // landed — otherwise the payload would miss the blockers just entered. The writes
+            // above are synchronous and awaited; a failed write stops the generation rather
+            // than sending a stale athlete to the engine.
+            3 -> if (persisted) generate() else toast("Couldn't save your blockers, so there's nothing to generate from.")
         }
     }
 
+    /**
+     * The real generation (Epic 2 story 5). The local stub used to fill four seconds with a
+     * delay; this suspends for as long as the engine takes — multi-minute waits are expected
+     * and the screen says so.
+     *
+     * Every attempt mints a fresh request id. The backend joins duplicates of the *same* id
+     * to one generation, so a double tap costs one plan, while a deliberate retry after a
+     * failure is a new request rather than a replay of the one that failed.
+     */
     private fun generate() {
-        if (draft.status != Status.DRAFT) return
-        update { copy(status = Status.GENERATING) }
-        generationJob = viewModelScope.launch {
-            delay(GENERATION_MS)
-            update { copy(proposal = ProposalEngine.generate(draft, today), status = Status.PROPOSED) }
-            step = 4
+        if (draft.status != Status.DRAFT && draft.status != Status.FAILED) return
+
+        // A plan on disk with no goals lock is an unapproved leftover from an abandoned
+        // attempt. It goes now, so a generation that fails cannot leave something behind that
+        // looks like a current plan.
+        if (goalsLock == null && !artifactsBlocked) {
+            runArtifacts { repository.deleteMesocyclePlan() }
         }
+
+        update { copy(status = Status.GENERATING, plan = null, generationError = null) }
+
+        generationJob = viewModelScope.launch {
+            when (val outcome = requestPlan()) {
+                is MesocycleResult.Ok -> {
+                    update { copy(plan = outcome.plan, status = Status.PROPOSED) }
+                    step = 4
+                }
+                is MesocycleResult.Failed -> {
+                    update { copy(status = Status.FAILED, generationError = outcome.error) }
+                    step = 4
+                }
+            }
+        }
+    }
+
+    /** Assembles from artifacts alone (Epic 1 story 6), then asks the engine. */
+    private suspend fun requestPlan(): MesocycleResult =
+        when (val assembled = MesoRequestAssembler(repository).assemble(today)) {
+            is MesoRequestResult.Invalid -> {
+                // The assembler names the artifact and the field; the screen shows one
+                // sentence, and the detail goes where it is actually useful.
+                toast("Can't generate — ${assembled.message}")
+                MesocycleResult.Failed(EngineError.PAYLOAD_INVALID)
+            }
+            is MesoRequestResult.Ok -> engine.generate(
+                MesocycleRequest(payload = assembled.payload, requestId = UUID.randomUUID().toString()),
+            )
+        }
+
+    /** From the failure screen. A new attempt, with a new request id. */
+    fun retryGeneration() {
+        if (draft.status != Status.FAILED) return
+        generate()
     }
 
     fun approve() {
         // Locks the mesocycle: fixed once approved (PRD §5.1) — priorities only change between cycles.
         if (draft.status != Status.PROPOSED) return
-        val proposal = draft.proposal ?: return
+        val plan = draft.plan ?: return
         if (artifactsBlocked) {
             // Refusing beats confirming a lock that was never written.
             toast("Can't approve — saved data is unreadable and must not be overwritten.")
             return
         }
 
-        // The lock must be durable *before* the athlete sees the confirmation, so this write
-        // is awaited and a failure leaves the proposal un-approved rather than confirming
-        // something process death could erase.
+        // **The write order is fixed (Epic 2 story 4): plan first, lock second.**
+        //
+        // The lock is the commit point the UI waits on, and it is minted from the plan as it
+        // was *read back off disk* — not from the copy in memory. If the plan write silently
+        // produced something different, the lock would inherit the difference rather than
+        // paper over it, and the dates the athlete is held to are the dates that survive a
+        // restart. (This amends Epic 1 story 3, where the lock came from the in-memory
+        // Proposal; Epic 1 carries the matching note.)
         val committed = runArtifacts {
             persistArtifacts(force = true)
+            repository.writeMesocyclePlan(plan)
+            val persisted = repository.readMesocyclePlan()
+                ?: ArtifactError.Missing(ArtifactId.MESOCYCLE_PLAN).raise()
             goalsLock = repository.lockGoals(
-                GoalsLock(approvedAt = clock.instant(), startDate = proposal.startDate, endDate = proposal.endDate),
+                GoalsLock(
+                    approvedAt = clock.instant(),
+                    startDate = persisted.startDate,
+                    endDate = persisted.endDate,
+                ),
             ).lockedForCycle
-            // The daily-tracking epic needs somewhere to write from day one (story 5).
+            // The daily-tracking epic needs somewhere to write from day one (Epic 1 story 5).
             // Never clobbers an existing log — a second cycle keeps its history.
             repository.initializeProgressionLogIfAbsent()
         }
@@ -290,13 +376,16 @@ class OnboardingViewModel(
     /** System back. Returns false when onboarding should let the system handle it (exit). */
     fun back(): Boolean {
         if (draft.status == Status.GENERATING) {
+            // Cancels the coroutine, which cancels the HTTP call, which closes the socket —
+            // and the backend, seeing nobody left waiting, aborts the generation. Walking
+            // away does not leave a plan being written for a screen no one is looking at.
             generationJob?.cancel()
             update { copy(status = Status.DRAFT) }
             return true
         }
         if (draft.status == Status.APPROVED) return false
         if (step > 1) {
-            if (step == 4) update { copy(status = Status.DRAFT) }
+            if (step == 4) update { copy(status = Status.DRAFT, generationError = null) }
             step -= 1
             return true
         }
@@ -316,8 +405,8 @@ class OnboardingViewModel(
      * approval refuses to proceed, because that is the one moment where a confirmation the
      * athlete has seen must be backed by something on disk.
      */
-    private fun persistArtifacts(force: Boolean = false) {
-        if (artifactsBlocked) return
+    private fun persistArtifacts(force: Boolean = false): Boolean {
+        if (artifactsBlocked) return false
         val now = clock.instant()
         val write = {
             repository.writeProfile(draft.toProfileArtifact(now))
@@ -327,7 +416,11 @@ class OnboardingViewModel(
             if (goalsLock == null) repository.writeGoals(draft.toGoalsArtifact(now))
             repository.writeBlockerCalendar(draft.constraints.toArtifact(now))
         }
-        if (force) write() else runArtifacts(write)
+        if (force) {
+            write()
+            return true
+        }
+        return runArtifacts(write)
     }
 
     /** Runs artifact work, turning a named failure into a snackbar. True when it committed. */
@@ -342,9 +435,10 @@ class OnboardingViewModel(
     // --- Post-approval summary --------------------------------------------
 
     /**
-     * What the approved screen shows. Live from the proposal in the session that approved
-     * it; after a restart from the goals artifact alone — the Mesocycle Plan itself is the
-     * next epic's artifact, so nothing here invents plan detail that was not persisted.
+     * What the approved screen shows. From the persisted Mesocycle Plan once Epic 2 landed —
+     * a restart now restores the real cycle, not just its dates. The goals-lock fallback
+     * stays for the one state that can still reach here without a plan: a cycle approved by
+     * a build that predates the plan artifact.
      */
     data class ApprovedSummary(
         val startDate: LocalDate,

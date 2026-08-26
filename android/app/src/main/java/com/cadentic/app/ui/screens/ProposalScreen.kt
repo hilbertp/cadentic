@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cadentic.app.OnboardingViewModel
 import com.cadentic.app.domain.Proposal
+import com.cadentic.app.domain.artifacts.PhaseType
+import com.cadentic.app.domain.isDeload
 import com.cadentic.app.domain.monthDay
 import com.cadentic.app.ui.components.PrimaryCta
 import com.cadentic.app.ui.components.StepScaffold
@@ -103,13 +105,16 @@ private fun PhaseTimeline(proposal: Proposal) {
         proposal.phases.forEach { phase ->
             // Width is proportional to weeks, with a floor so a 1-week segment still fits its label.
             val weight = phase.weeks.toFloat().coerceAtLeast(1.4f)
-            val (bg, nameColor, weekColor) = when (phase.name) {
-                "Base" -> Triple(Ink.faintFill7, Ink.primary, Ink.secondary)
-                "Build" -> Triple(Ink.accentTint18, Ink.accentDeep, Ink.accentDeep)
-                "Peak" -> Triple(Ink.accentTint38, Ink.accentDeeper, Ink.accentDeeper)
-                else -> Triple(Ink.surface, Ink.accentDeep, Ink.accentDeep)
+            // Switched on phaseType, never on the name: the name is whatever the engine chose
+            // to call the phase, and a plan that says "Foundation" instead of "Base" must
+            // still colour and dash correctly.
+            val (bg, nameColor, weekColor) = when (phase.phaseType) {
+                PhaseType.BASE -> Triple(Ink.faintFill7, Ink.primary, Ink.secondary)
+                PhaseType.BUILD -> Triple(Ink.accentTint18, Ink.accentDeep, Ink.accentDeep)
+                PhaseType.PEAK -> Triple(Ink.accentTint38, Ink.accentDeeper, Ink.accentDeeper)
+                PhaseType.DELOAD -> Triple(Ink.surface, Ink.accentDeep, Ink.accentDeep)
             }
-            val isDeload = phase.name == "Deload"
+            val isDeload = phase.phaseType.isDeload
             Column(
                 Modifier.weight(weight)
                     .fillMaxSize()
