@@ -3,6 +3,7 @@ package com.cadentic.app
 import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.OnboardingDraft
 import com.cadentic.app.domain.Seed
+import com.cadentic.app.domain.artifacts.ARTIFACT_SCHEMA_VERSION
 import com.cadentic.app.domain.artifacts.ArtifactError
 import com.cadentic.app.domain.artifacts.ArtifactId
 import com.cadentic.app.domain.artifacts.ArtifactRepository
@@ -65,8 +66,9 @@ class MesoRequestAssemblerTest {
         assertEquals(listOf(Category.CARDIO, Category.EXPLOSIVENESS, Category.STRENGTH), payload.goals.priorities)
         assertEquals(listOf(Category.CARDIO, Category.EXPLOSIVENESS), payload.goals.focusThisCycle)
         assertEquals(listOf(Category.STRENGTH), payload.goals.queuedForLater)
-        assertEquals(13, payload.blockerCalendar.fixtures.size)
-        assertEquals("Season schedule", payload.blockerCalendar.fixtureSourceLabel)
+        // 13 seeded game days, all one-offs now.
+        assertEquals(13, payload.blockerCalendar.oneOffs.size)
+        assertEquals("Team practice", payload.blockerCalendar.recurring.single().label)
     }
 
     @Test
@@ -80,13 +82,13 @@ class MesoRequestAssemblerTest {
     }
 
     @Test
-    fun `blocker ids are stripped from the payload but the fixture source survives`() {
+    fun `blocker ids are stripped from the payload`() {
         persistCompleteOnboarding()
 
         val json = (assembleAfterRestart() as MesoRequestResult.Ok).json.toString()
 
         assertFalse("local storage ids have no meaning to the engine", json.contains("\"id\""))
-        assertTrue(json.contains("Season schedule"))
+        assertTrue("the blockers themselves must survive", json.contains("Round 1"))
     }
 
     @Test
@@ -130,7 +132,7 @@ class MesoRequestAssemblerTest {
     fun `an artifact this build cannot read fails assembly by name instead of throwing`() {
         persistCompleteOnboarding()
         val f = File(dir(), ArtifactId.ATHLETE_GOALS.fileName)
-        f.writeText(f.readText().replace("\"schemaVersion\": 1", "\"schemaVersion\": 42"))
+        f.writeText(f.readText().replace("\"schemaVersion\": $ARTIFACT_SCHEMA_VERSION", "\"schemaVersion\": 42"))
 
         val invalid = assembleAfterRestart() as MesoRequestResult.Invalid
 
@@ -166,7 +168,7 @@ class MesoRequestAssemblerTest {
     @Test
     fun `an empty blocker calendar is legitimate - an athlete with nothing booked still plans`() {
         persistCompleteOnboarding {
-            copy(constraints = constraints.copy(recurring = emptyList(), fixtures = emptyList(), oneOffs = emptyList()))
+            copy(constraints = constraints.copy(recurring = emptyList(), oneOffs = emptyList()))
         }
 
         assertTrue(assembleAfterRestart() is MesoRequestResult.Ok)

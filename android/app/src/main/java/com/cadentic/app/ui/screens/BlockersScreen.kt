@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cadentic.app.OnboardingViewModel
 import com.cadentic.app.domain.DayEntry
-import com.cadentic.app.domain.Fixture
 import com.cadentic.app.domain.OneOffBlocker
 import com.cadentic.app.domain.RecurringBlocker
 import com.cadentic.app.domain.Strain
@@ -64,10 +63,8 @@ import java.util.Locale
 // Which bottom sheet is open. Day cells route here: a day with one entry opens that entity
 // directly, a day with several opens the day sheet, an empty future day opens Add.
 private sealed interface Sheet {
-    data object Fixtures : Sheet
     data class Recurring(val id: Long) : Sheet
     data class Add(val prefillDate: LocalDate? = null) : Sheet
-    data class FixtureDetail(val id: Long, val fromList: Boolean = false) : Sheet
     data class OneOffDetail(val id: Long) : Sheet
     data class Day(val date: LocalDate) : Sheet
 }
@@ -87,7 +84,6 @@ private fun strainDot(strain: Strain) = when (strain) {
 }
 
 private fun DayEntry.kindLabel() = when (this) {
-    is DayEntry.Game -> "game"
     is DayEntry.OneOff -> "one-off"
     is DayEntry.Practice -> "practice"
 }
@@ -98,8 +94,7 @@ fun BlockersScreen(vm: OnboardingViewModel) {
     val draft = vm.draft
     val constraints = draft.constraints
     var sheet by remember { mutableStateOf<Sheet?>(null) }
-    val nothingScheduled = constraints.fixtures.isEmpty() &&
-        constraints.recurring.isEmpty() && constraints.oneOffs.isEmpty()
+    val nothingScheduled = constraints.recurring.isEmpty() && constraints.oneOffs.isEmpty()
 
     StepScaffold(
         step = 3,
@@ -108,7 +103,7 @@ fun BlockersScreen(vm: OnboardingViewModel) {
         Text("What must the plan respect?", style = Type.h1(25.sp), modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
         Text(
             if (nothingScheduled) "Nothing on the calendar yet. Add what the plan has to work around."
-            else "Practices repeat weekly. Games land where the league puts them.",
+            else "Practices repeat weekly. One-offs land on a single date.",
             style = Type.intro(13.5.sp), modifier = Modifier.padding(bottom = 16.dp),
         )
 
@@ -122,14 +117,6 @@ fun BlockersScreen(vm: OnboardingViewModel) {
 
         SectionLabel("Sources", Modifier.padding(top = 16.dp, bottom = 8.dp), size = 10.5.sp, tracking = 1.4.sp)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (constraints.fixtures.isNotEmpty()) {
-                SourceRow(
-                    dot = Ink.strainHard,
-                    title = "${constraints.fixtureSourceLabel} · " + plural(constraints.fixtures.size, "fixture"),
-                    subtitle = "Imported · league calendar · updates itself",
-                    action = "Manage",
-                ) { sheet = Sheet.Fixtures }
-            }
             constraints.recurring.forEach { blocker ->
                 SourceRow(
                     dot = strainDot(blocker.strain),
@@ -161,19 +148,10 @@ fun BlockersScreen(vm: OnboardingViewModel) {
 
     // Resolve by id at render time so a sheet never edits a stale copy.
     when (val s = sheet) {
-        is Sheet.Fixtures -> FixturesSheet(
-            vm,
-            onSelect = { sheet = Sheet.FixtureDetail(it.id, fromList = true) },
-        ) { sheet = null }
-
         is Sheet.Recurring -> constraints.recurring.firstOrNull { it.id == s.id }
             ?.let { RecurringSheet(vm, it) { sheet = null } } ?: run { sheet = null }
 
         is Sheet.Add -> AddBlockerSheet(vm, s.prefillDate) { sheet = null }
-
-        is Sheet.FixtureDetail -> constraints.fixtures.firstOrNull { it.id == s.id }
-            ?.let { f -> FixtureDetailSheet(vm, f) { sheet = if (s.fromList) Sheet.Fixtures else null } }
-            ?: run { sheet = null }
 
         is Sheet.OneOffDetail -> constraints.oneOffs.firstOrNull { it.id == s.id }
             ?.let { OneOffDetailSheet(vm, it) { sheet = null } } ?: run { sheet = null }
@@ -183,8 +161,6 @@ fun BlockersScreen(vm: OnboardingViewModel) {
         null -> {}
     }
 }
-
-private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
 
 @Composable
 private fun HorizonCard(vm: OnboardingViewModel, onOpen: (Sheet) -> Unit) {
@@ -222,7 +198,6 @@ private fun HorizonCard(vm: OnboardingViewModel, onOpen: (Sheet) -> Unit) {
                                 when {
                                     cell.entries.size > 1 -> onOpen(Sheet.Day(cell.date))
                                     cell.entries.size == 1 -> when (val e = cell.entries.first()) {
-                                        is DayEntry.Game -> onOpen(Sheet.FixtureDetail(e.fixture.id))
                                         is DayEntry.OneOff -> onOpen(Sheet.OneOffDetail(e.blocker.id))
                                         is DayEntry.Practice -> onOpen(Sheet.Recurring(e.blocker.id))
                                     }
@@ -248,7 +223,7 @@ private fun DayCellView(
 ) {
     val primary = cell.primary
     val shape = RoundedCornerShape(9.dp)
-    val filled = primary is DayEntry.Game || primary is DayEntry.OneOff
+    val filled = primary is DayEntry.OneOff
 
     // Past days can't take a new blocker; anything already booked stays reviewable.
     val interactive = !isPast || cell.entries.isNotEmpty()
@@ -422,16 +397,10 @@ private fun DaySheet(
     onDismiss: () -> Unit,
 ) {
     val c = vm.draft.constraints
-    val games = c.fixtures.filter { it.date == date }
     val oneOffs = c.oneOffs.filter { it.date == date }
     val practices = c.recurring.filter { date.dayOfWeek in it.days }
     SheetFrame(onDismiss, date.format(FULL_DATE), "Everything the plan has to work around on this day.") {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            games.forEach { f ->
-                DayEntryRow(f.label, "Game · ${f.strain.label}", strainDot(f.strain)) {
-                    onOpen(Sheet.FixtureDetail(f.id))
-                }
-            }
             oneOffs.forEach { b ->
                 DayEntryRow(b.label, "One-off · ${b.strain.label}", strainDot(b.strain)) {
                     onOpen(Sheet.OneOffDetail(b.id))
@@ -474,73 +443,6 @@ private fun DayEntryRow(title: String, subtitle: String, dot: Color, onClick: ()
             Text(subtitle, style = sans(12.5.sp, color = Ink.secondary), modifier = Modifier.padding(top = 1.dp))
         }
         Text("Edit", style = sans(12.sp, FontWeight.SemiBold, color = Ink.accentDeep))
-    }
-}
-
-/** Season fixtures: imported source — rows open the per-game detail. */
-@Composable
-private fun FixturesSheet(vm: OnboardingViewModel, onSelect: (Fixture) -> Unit, onDismiss: () -> Unit) {
-    val fixtures = vm.draft.constraints.fixtures
-    SheetFrame(
-        onDismiss,
-        "Season schedule",
-        if (fixtures.isEmpty()) "No fixtures left — you've dropped every game from this season."
-        else "Imported from the league calendar — it updates itself when rounds move. Tap a game to review it.",
-        scrollable = false, // has its own inner scroll
-    ) {
-        if (fixtures.isEmpty()) {
-            Text(
-                "Re-import the league calendar to bring them back.",
-                style = sans(13.sp, color = Ink.secondary),
-            )
-        } else {
-            Column(
-                Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                fixtures.forEach { f ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(Ink.surface)
-                            .border(1.dp, Ink.hairline, RoundedCornerShape(11.dp))
-                            .clickable { onSelect(f) }
-                            .padding(horizontal = 13.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(strainDot(f.strain)))
-                        Text(f.label, style = sans(13.5.sp, FontWeight.SemiBold), modifier = Modifier.weight(1f))
-                        Text(f.date.format(DAY_DATE), style = sans(12.5.sp, color = Ink.secondary))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Per-game view: the league owns the date, the athlete owns what it costs. */
-@Composable
-private fun FixtureDetailSheet(vm: OnboardingViewModel, fixture: Fixture, onDismiss: () -> Unit) {
-    var strain by remember(fixture.id) { mutableStateOf(fixture.strain) }
-    SheetFrame(
-        onDismiss,
-        fixture.label,
-        "${fixture.date.format(FULL_DATE)} · imported from the league calendar. " +
-            "The date is the league's; how much it costs you is your call.",
-    ) {
-        SectionLabel("Strain", Modifier.padding(bottom = 6.dp))
-        StrainPicker(strain) { strain = it }
-        Box(Modifier.padding(top = 18.dp)) {
-            PrimaryCta("Save", height = 52.dp) {
-                vm.setFixtureStrain(fixture.id, strain)
-                onDismiss()
-            }
-        }
-        RemoveButton("I'm not playing this one") {
-            vm.removeFixture(fixture.id)
-            onDismiss()
-        }
     }
 }
 

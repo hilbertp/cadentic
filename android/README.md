@@ -33,7 +33,7 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
   - `data/JsonArtifactRepository.kt` — one JSON document per artifact in app-private
     storage, written atomically.
   - `domain/Engine.kt` — local stand-in for the server: persona seed data
-    (13 imported fixtures, Tue/Thu practice), the 6-week horizon derivation, and
+    (13 game days, Tue/Thu practice), the 6-week horizon derivation, and
     the mesocycle proposal generator. `ProposalEngine.generate` is a pure local
     stub — it does **not** call an LLM and builds no request payload. Swap it for
     a real API call when the engine lands.
@@ -54,11 +54,10 @@ the SDK; regenerate it if your SDK lives elsewhere (`sdk.dir=<path>`).
   location field, no auto climate constraint, no heat banner/acclimation ramp/
   session windows in the proposal.
 - **Beyond the handoff:** every day cell in the 6-week horizon calendar is
-  tappable — games open a per-fixture sheet (date is the league's, strain is
-  the athlete's call), practices open the recurring-blocker editor, one-offs
-  open their detail, empty days open the add sheet prefilled with that date.
-  Everything on the calendar can be edited or deleted from its own sheet,
-  including declining a league fixture ("I'm not playing this one").
+  tappable — practices open the recurring-blocker editor, one-offs (game days
+  included) open their detail, empty days open the add sheet prefilled with
+  that date. Everything on the calendar can be edited or deleted from its own
+  sheet, including dropping a game you're not playing.
 - Bottom sheets open fully expanded and scroll. A partially-expanded sheet
   silently hides whatever sits below the fold — that made Delete and even the
   Add CTA unreachable.
@@ -89,7 +88,7 @@ nothing is lost, and the future Mesocycle Engine reads artifacts, never UI state
 | `athlete-profile.json` | step 1 → 2 | age, sex, height, weight (numbers) |
 | `athlete-status.json` | step 1 → 2, step 2 → 3 | experience, per-category rating (`null` = skipped), injuries |
 | `athlete-goals.json` | step 2 → 3 (and any forward step after an edit) | lane, ordered priorities, effective focus count, excluded categories, `lockedForCycle` |
-| `blocker-calendar.json` | step 3 → generate | recurring blockers, fixtures, one-offs, strain, `fixtureSourceLabel` |
+| `blocker-calendar.json` | step 3 → generate | recurring blockers and one-offs, each with strain |
 | `progression-log.json` | at approval | empty; schema fixed for the daily-tracking epic |
 
 `MesoRequestAssembler.assemble(requestDate)` composes the first four into the
@@ -124,18 +123,19 @@ ids stripped, `requestDate` injected at composition time:
     "recurring": [
       { "label": "Team practice", "days": ["TUESDAY", "THURSDAY"], "timeRange": "19:00–20:30", "strain": "MEDIUM" }
     ],
-    "fixtures": [{ "date": "2026-08-29", "label": "Round 1", "strain": "HARD" }],
-    "fixtureSourceLabel": "Season schedule",
-    "oneOffs": []
+    "oneOffs": [{ "date": "2026-08-29", "label": "Round 1", "strain": "HARD" }]
   }
 }
 ```
 
 Rules a consumer can rely on:
 
-- **`requestDate` is always present** — the cycle is calendar-anchored and fixtures
-  carry absolute dates, so phases and deloads cannot be laid out without it.
-  Validation fails if it is missing.
+- **`requestDate` is always present** — the cycle is calendar-anchored and one-off
+  blockers carry absolute dates, so phases and deloads cannot be laid out without
+  it. Validation fails if it is missing.
+- **The calendar has exactly two kinds:** `recurring` (weekly) and `oneOffs` (a
+  single date). A league game is a one-off — there is no separate fixture kind and
+  no schedule import behind one.
 - **`focusCount` ≤ `min(2, priorities.size)`**, enforced both where the artifact is
   written and again on the payload. `focusThisCycle` and `queuedForLater` are the
   priority list split at that count.
@@ -161,8 +161,13 @@ Rules a consumer can rely on:
   priorities inside an approved cycle. The lock lives in the artifact, so a restart
   does not reopen it.
 - **The payload is nested per artifact, with blocker ids stripped.** Ids are local
-  storage handles that mean nothing to a planner; `fixtureSourceLabel` is kept,
-  because it says how firm those dates are.
+  storage handles that mean nothing to a planner.
+- **No separate fixture kind (schema v2).** League games were once modelled apart
+  from one-offs, on the assumption of a schedule import that would own their dates
+  and leave the athlete only the strain. No import exists — PRD §18 parks it — so
+  the distinction bought nothing and the athlete now owns game days like any other
+  blocker. v1 stores migrate on read: fixtures fold into `oneOffs`,
+  `fixtureSourceLabel` is dropped.
 - **Blocker ids: persisted, with the counter re-seeded on load.** The artifact
   already carries every live id, so the high-water mark needs no document of its
   own and `Long` ids stay as the UI knows them.

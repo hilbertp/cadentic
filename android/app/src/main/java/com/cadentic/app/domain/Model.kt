@@ -57,13 +57,6 @@ data class RecurringBlocker(
         }
 }
 
-data class Fixture(
-    val id: Long,
-    val date: LocalDate,
-    val label: String,
-    val strain: Strain = Strain.HARD,
-)
-
 data class OneOffBlocker(
     val id: Long,
     val date: LocalDate,
@@ -71,11 +64,16 @@ data class OneOffBlocker(
     val strain: Strain,
 )
 
-// Location/climate deliberately absent: athletes manage heat and conditions themselves.
+/**
+ * Two kinds, and only two: something that repeats weekly, and something that lands on a
+ * single date. League games are the latter — they were once a third kind fed by a schedule
+ * import, but with no import to be authoritative about their dates there was nothing left
+ * to distinguish them from any other one-off the athlete owns.
+ *
+ * Location/climate deliberately absent: athletes manage heat and conditions themselves.
+ */
 data class Constraints(
     val recurring: List<RecurringBlocker>,
-    val fixtures: List<Fixture>,
-    val fixtureSourceLabel: String,
     val oneOffs: List<OneOffBlocker> = emptyList(),
 )
 

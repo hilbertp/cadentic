@@ -1,7 +1,7 @@
 # Epic 1: Athlete Data Artifacts
 
 **Parent doc:** `design_handoff_cadentic_onboarding/cadentic_prd_v_1_1.md` (§5.2 artifacts, §6 inputs, §9 onboarding)
-**Status:** implemented (2026-08-26). Revised after implementor review — verdict *agree with changes*, all findings folded in; the owner question is resolved and the open points are answered (both at the bottom).
+**Status:** implemented (2026-08-26), then amended — the blocker calendar's third kind (`fixtures`) was dropped; see the sketch note. Revised after implementor review — verdict *agree with changes*, all findings folded in; the owner question is resolved and the open points are answered (both at the bottom).
 
 ## Goal
 
@@ -75,7 +75,7 @@ The PRD decomposes artifacts by *change cadence*, and the current code groups fi
 | `Profile.experience` | **athlete-status.json** | PRD §5.2 places experience in Status; stored as the label string for MVP |
 | `OnboardingDraft.injuries` | **athlete-status.json** | Free-text list, captured via chips on the Priorities screen |
 | `OnboardingDraft.priorities / focusCount / lane` + `dontCare` exclusions | **athlete-goals.json** | `dontCare` is a *goals* exclusion, not a status fact — even a rated category can be excluded |
-| `Constraints` (recurring, fixtures, one-offs, `fixtureSourceLabel`; stable `id`s) | **blocker-calendar.json** | Two identical-looking blockers must stay distinct (see `Model.kt` comment) — but the in-memory `Ids` counter resets per process, so durability needs a persisted high-water mark or UUID re-keying (story 4, open point 5) |
+| `Constraints` (recurring, one-offs; stable `id`s — `fixtures` and `fixtureSourceLabel` removed in the amendment below) | **blocker-calendar.json** | Two identical-looking blockers must stay distinct (see `Model.kt` comment) — but the in-memory `Ids` counter resets per process, so durability needs a persisted high-water mark or UUID re-keying (story 4, open point 5) |
 | — (new) | `athlete-goals.json → lockedForCycle` | Lock snapshot minted at approval from the in-memory `Proposal` (story 3) |
 | — (new) | **progression-log.json** | Schema defined now, initialized empty; written by the daily-tracking epic |
 | — (gap) | *(not captured)* | Free-text long-term goals (PRD §5.2 row 2): the shipped wizard captures ranked priorities + lane instead — **owner confirmed** this stands in for MVP; PRD §5.2 and §9 carry the note |
@@ -115,11 +115,17 @@ Every artifact carries `schemaVersion` and `updatedAt`.
 ```json
 // blocker-calendar.json — timeRange is OPAQUE free text (consumers must not
 // parse it); days serialized in canonical sorted order
-{ "schemaVersion": 1, "updatedAt": "…",
+//
+// AMENDED after implementation (2026-08-26, owner): the third kind — `fixtures`,
+// with `fixtureSourceLabel` — is GONE. It existed for an imported league schedule
+// that would stay authoritative on game dates; PRD §18 parks that import, so a
+// game day is just a one-off the athlete owns. Schema is now v2; v1 stores migrate
+// on read by folding fixtures into oneOffs. Stories 4 and 6 read accordingly:
+// wherever they say "all three blocker kinds", there are two.
+{ "schemaVersion": 2, "updatedAt": "…",
   "recurring": [ { "id": 1, "label": "Team practice", "days": ["TUESDAY","THURSDAY"], "timeRange": "19:00–20:30", "strain": "MEDIUM" } ],
-  "fixtures":  [ { "id": 2, "date": "2026-09-06", "label": "League game", "strain": "HARD" } ],
-  "fixtureSourceLabel": "…",
-  "oneOffs":   [ { "id": 3, "date": "2026-09-12", "label": "Travel day", "strain": "LIGHT" } ] }
+  "oneOffs":   [ { "id": 2, "date": "2026-09-06", "label": "League game", "strain": "HARD" },
+                 { "id": 3, "date": "2026-09-12", "label": "Travel day", "strain": "LIGHT" } ] }
 ```
 
 ```json

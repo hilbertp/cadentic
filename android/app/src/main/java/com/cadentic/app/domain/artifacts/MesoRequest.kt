@@ -27,21 +27,24 @@ import java.time.LocalDate
  * `updatedAt` are dropped — the payload carries its own version — and **blocker ids are
  * stripped**: they are local storage identifiers with no meaning to a planner, and passing
  * them would invite the LLM to reference handles that mean nothing on its side.
- * `fixtureSourceLabel` *is* passed through: "Season schedule" is real provenance about how
- * firm those dates are.
+ *
+ * The calendar has two kinds and only two: `recurring` (weekly) and `oneOffs` (a single
+ * date). League games are one-offs — v1 modelled them separately, on the assumption of a
+ * schedule import that would own their dates; there is no such import, so there was nothing
+ * left to distinguish them.
  *
  * Cycle N>1 needs no extra input — the Post-Mesocycle Review updates Status and Goals in
  * place (PRD §14), so a later assembly is the same read of the same four artifacts.
  */
-const val MESO_REQUEST_SCHEMA_VERSION: Int = 1
+const val MESO_REQUEST_SCHEMA_VERSION: Int = 2
 
 @Serializable
 data class MesoRequestPayload(
     val schemaVersion: Int = MESO_REQUEST_SCHEMA_VERSION,
     /**
      * The temporal anchor, injected at composition time. Not optional: the cycle is
-     * calendar-anchored (PRD §14) and fixtures carry absolute dates, so phases and deloads
-     * cannot be laid against a September game without knowing when the cycle starts.
+     * calendar-anchored (PRD §14) and one-off blockers carry absolute dates, so phases and
+     * deloads cannot be laid against a September game without knowing when the cycle starts.
      */
     val requestDate: LocalDate,
     val profile: ProfileSection,
@@ -72,8 +75,6 @@ data class MesoRequestPayload(
     @Serializable
     data class CalendarSection(
         val recurring: List<Recurring>,
-        val fixtures: List<Dated>,
-        val fixtureSourceLabel: String,
         val oneOffs: List<Dated>,
     ) {
         @Serializable
@@ -149,10 +150,6 @@ class MesoRequestAssembler(private val repository: ArtifactRepository) {
                 recurring = calendar.recurring.map {
                     MesoRequestPayload.CalendarSection.Recurring(it.label, it.days, it.timeRange, it.strain)
                 },
-                fixtures = calendar.fixtures.map {
-                    MesoRequestPayload.CalendarSection.Dated(it.date, it.label, it.strain)
-                },
-                fixtureSourceLabel = calendar.fixtureSourceLabel,
                 oneOffs = calendar.oneOffs.map {
                     MesoRequestPayload.CalendarSection.Dated(it.date, it.label, it.strain)
                 },
@@ -252,13 +249,10 @@ private fun BlockerCalendarArtifact.validate(): List<ArtifactError> {
             if (it.label.isBlank()) add(ArtifactError.MissingField(id, "recurring[${it.id}].label"))
             if (it.days.isEmpty()) add(ArtifactError.MissingField(id, "recurring[${it.id}].days"))
         }
-        fixtures.forEach {
-            if (it.label.isBlank()) add(ArtifactError.MissingField(id, "fixtures[${it.id}].label"))
-        }
         oneOffs.forEach {
             if (it.label.isBlank()) add(ArtifactError.MissingField(id, "oneOffs[${it.id}].label"))
         }
-        val ids = recurring.map { it.id } + fixtures.map { it.id } + oneOffs.map { it.id }
+        val ids = recurring.map { it.id } + oneOffs.map { it.id }
         if (ids.distinct().size != ids.size) {
             add(ArtifactError.InvalidField(id, "id", "blocker ids are not unique"))
         }

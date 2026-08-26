@@ -13,7 +13,7 @@ fun LocalDate.monthShort(): String = format(MONTH_SHORT)
 
 fun weekStart(date: LocalDate): LocalDate = date.with(DayOfWeek.MONDAY)
 
-/** Stub data source standing in for the league-calendar import. Persona: club basketball. */
+/** Persona seed: club basketball, one weekly practice and a season's worth of game days. */
 object Seed {
     fun constraints(today: LocalDate): Constraints {
         val wk = weekStart(today)
@@ -26,11 +26,13 @@ object Seed {
             11L to DayOfWeek.SATURDAY, 12L to DayOfWeek.FRIDAY, 13L to DayOfWeek.SATURDAY,
             15L to DayOfWeek.SATURDAY,
         )
-        val fixtures = gameOffsets.mapIndexed { i, (weeks, day) ->
-            Fixture(
+        // Game days are ordinary one-off blockers: hard, on a fixed date, the athlete's to edit.
+        val games = gameOffsets.mapIndexed { i, (weeks, day) ->
+            OneOffBlocker(
                 id = Ids.next(),
                 date = wk.plusWeeks(weeks).with(day),
                 label = "Round ${i + 1}",
+                strain = Strain.HARD,
             )
         }
         return Constraints(
@@ -43,8 +45,7 @@ object Seed {
                     strain = Strain.MEDIUM,
                 )
             ),
-            fixtures = fixtures,
-            fixtureSourceLabel = "Season schedule",
+            oneOffs = games,
         )
     }
 }
@@ -70,15 +71,10 @@ object Ids {
     }
 }
 
-/** What actually sits on a given day. Ranked: a game outranks a one-off outranks practice. */
+/** What actually sits on a given day. Ranked: a one-off outranks a recurring practice. */
 sealed interface DayEntry {
     val strain: Strain
     val label: String
-
-    data class Game(val fixture: Fixture) : DayEntry {
-        override val strain get() = fixture.strain
-        override val label get() = fixture.label
-    }
 
     data class OneOff(val blocker: OneOffBlocker) : DayEntry {
         override val strain get() = blocker.strain
@@ -113,7 +109,6 @@ fun horizon(constraints: Constraints, today: LocalDate, weeks: Int = 6): List<Ho
             cells = (0..6).map { d ->
                 val date = monday.plusDays(d.toLong())
                 val entries = buildList {
-                    constraints.fixtures.filter { it.date == date }.forEach { add(DayEntry.Game(it)) }
                     constraints.oneOffs.filter { it.date == date }.forEach { add(DayEntry.OneOff(it)) }
                     constraints.recurring.filter { date.dayOfWeek in it.days }.forEach { add(DayEntry.Practice(it)) }
                 }
@@ -132,32 +127,34 @@ object ProposalEngine {
     fun generate(draft: OnboardingDraft, today: LocalDate): Proposal {
         val start = today
         val end = start.plusWeeks(12).minusDays(1)
-        val games = draft.constraints.fixtures.count { !it.date.isBefore(start) && !it.date.isAfter(end) }
+        val hardDays = draft.constraints.oneOffs.count {
+            it.strain == Strain.HARD && !it.date.isBefore(start) && !it.date.isAfter(end)
+        }
         val longevity = draft.lane == Lane.LONGEVITY
 
-        // Reads correctly at 0, 1, and many — every count is reachable now that fixtures are deletable.
-        val gamesClause = when (games) {
+        // Reads correctly at 0, 1, and many — every count is reachable, blockers are deletable.
+        val hardDaysClause = when (hardDays) {
             0 -> if (longevity)
-                "No games are on the calendar, so the hard weeks land where the training wants them."
+                "Nothing hard is booked, so the heavy weeks land where the training wants them."
             else
-                "No games are on the calendar, so nothing softens the heavy weeks."
+                "Nothing hard is booked, so nothing softens the heavy weeks."
             1 -> if (longevity)
-                "One game sits inside this cycle; the hard weeks bend around it, never through it."
+                "One hard day sits inside this cycle; the heavy weeks bend around it, never through it."
             else
-                "One game sits inside this cycle — expect heavy weeks stacked tight around it."
+                "One hard day sits inside this cycle — expect heavy weeks stacked tight around it."
             else -> if (longevity)
-                "$games games sit inside this cycle; the hard weeks bend around them, never through them."
+                "$hardDays hard days sit inside this cycle; the heavy weeks bend around them, never through them."
             else
-                "$games games sit inside this cycle — expect heavy weeks stacked tight between them."
+                "$hardDays hard days sit inside this cycle — expect heavy weeks stacked tight between them."
         }
 
         val coachNote = if (longevity)
             "Twelve weeks, one engine. Base lays the aerobic floor, build loads on top of it, peak sharpens " +
                 "the stretch that matters, and the deload lands in week 12 whether you feel you need it or " +
-                "not — that's the point. $gamesClause"
+                "not — that's the point. $hardDaysClause"
         else
             "Twelve weeks, output first. Base is short runway, build pushes volume hard, peak is two weeks " +
-                "of edge, and the deload in week 12 is non-negotiable even in this lane. $gamesClause"
+                "of edge, and the deload in week 12 is non-negotiable even in this lane. $hardDaysClause"
 
         return Proposal(
             startDate = start,

@@ -217,8 +217,12 @@ class OnboardingArtifactFlowTest {
         // Deleting one twin must leave the other standing, on disk as well as in memory.
         relaunched.removeOneOff(twins[0].id)
         relaunched.continueFromStep(1)
-        assertEquals(listOf(twins[1].id), relaunched.draft.constraints.oneOffs.map { it.id })
-        assertEquals(listOf(twins[1].id), repository().readBlockerCalendar()!!.oneOffs.map { it.id })
+        val surviving = relaunched.draft.constraints.oneOffs.map { it.id }
+        assertFalse(twins[0].id in surviving)
+        assertTrue(twins[1].id in surviving)
+        val onDisk = repository().readBlockerCalendar()!!.oneOffs.map { it.id }
+        assertFalse(twins[0].id in onDisk)
+        assertTrue(twins[1].id in onDisk)
     }
 
     // --- Story 0: the approval write is awaited -----------------------------
@@ -252,7 +256,7 @@ class OnboardingArtifactFlowTest {
             first.addOneOff(TODAY.plusDays(3), "Wedding", Strain.MEDIUM)
             first.continueFromStep(1)
             val persistedIds = first.draft.constraints.let { c ->
-                (c.recurring.map { it.id } + c.fixtures.map { it.id } + c.oneOffs.map { it.id }).toSet()
+                (c.recurring.map { it.id } + c.oneOffs.map { it.id }).toSet()
             }
 
             // The id counter restarts at 0 with the process; the calendar re-seeds it.
@@ -268,16 +272,16 @@ class OnboardingArtifactFlowTest {
     fun `the persona seed does not re-run once a calendar has been persisted`() =
         runTest(mainDispatcher.dispatcher) {
             val first = launchApp()
-            val seededFixtures = first.draft.constraints.fixtures.size
+            val seededGameDays = first.draft.constraints.oneOffs.size
             first.continueFromStep(1)
-            first.removeFixture(first.draft.constraints.fixtures.first().id)
+            first.removeOneOff(first.draft.constraints.oneOffs.first().id)
             first.continueFromStep(2)
 
             Restart.simulate()
             val relaunched = launchApp()
 
-            // Without the guard, every launch would push a fresh set of fixtures back in.
-            assertEquals(seededFixtures - 1, relaunched.draft.constraints.fixtures.size)
-            assertEquals(seededFixtures - 1, repository().readBlockerCalendar()!!.fixtures.size)
+            // Without the guard, every launch would push a fresh set of game days back in.
+            assertEquals(seededGameDays - 1, relaunched.draft.constraints.oneOffs.size)
+            assertEquals(seededGameDays - 1, repository().readBlockerCalendar()!!.oneOffs.size)
         }
 }

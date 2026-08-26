@@ -14,7 +14,9 @@ import com.cadentic.app.domain.artifacts.raise
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
@@ -148,10 +150,34 @@ class JsonArtifactRepository(
             ArtifactError.UnsupportedSchemaVersion(id, version, ARTIFACT_SCHEMA_VERSION).raise()
         }
         return try {
-            json.decodeFromJsonElement(serializer, root)
+            json.decodeFromJsonElement(serializer, migrate(id, version, root))
         } catch (e: Exception) {
             ArtifactError.Corrupt(id, e.message ?: "does not match schema v$version").raise()
         }
+    }
+
+    /**
+     * Brings an older document up to [ARTIFACT_SCHEMA_VERSION] before decoding.
+     *
+     * v1 → v2 (blocker calendar): `fixtures` were imported league games, kept apart from
+     * one-offs because a schedule import was to stay authoritative on their dates. No import
+     * was ever built, so the distinction bought nothing and was dropped. The two records are
+     * identical in shape, so v1's fixtures fold straight into `oneOffs` and
+     * `fixtureSourceLabel` is discarded. The next write re-canonicalises the order.
+     *
+     * Delete this once no v1 store can exist in the wild.
+     */
+    private fun migrate(id: ArtifactId, version: Int, root: JsonObject): JsonObject {
+        if (id != ArtifactId.BLOCKER_CALENDAR || version >= 2) return root
+        val fixtures = (root["fixtures"] as? JsonArray).orEmpty()
+        val oneOffs = (root["oneOffs"] as? JsonArray).orEmpty()
+        val migrated = root.toMutableMap().apply {
+            remove("fixtures")
+            remove("fixtureSourceLabel")
+            this["schemaVersion"] = JsonPrimitive(ARTIFACT_SCHEMA_VERSION)
+            this["oneOffs"] = JsonArray(fixtures + oneOffs)
+        }
+        return JsonObject(migrated)
     }
 
     /**
@@ -185,3 +211,5 @@ class JsonArtifactRepository(
 
 private fun kotlinx.serialization.json.JsonPrimitive.intOrNullSafe(): Int? =
     runCatching { int }.getOrNull()
+
+private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this ?: emptyList()

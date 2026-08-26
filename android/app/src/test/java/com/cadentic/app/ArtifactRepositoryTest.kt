@@ -4,6 +4,7 @@ import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Lane
 import com.cadentic.app.domain.Rating
 import com.cadentic.app.domain.Sex
+import com.cadentic.app.domain.Strain
 import com.cadentic.app.domain.artifacts.ARTIFACT_SCHEMA_VERSION
 import com.cadentic.app.domain.artifacts.ArtifactError
 import com.cadentic.app.domain.artifacts.ArtifactException
@@ -12,6 +13,7 @@ import com.cadentic.app.domain.artifacts.AthleteGoalsArtifact
 import com.cadentic.app.domain.artifacts.AthleteProfileArtifact
 import com.cadentic.app.domain.artifacts.AthleteStatusArtifact
 import com.cadentic.app.domain.artifacts.GoalsLock
+import com.cadentic.app.domain.artifacts.highestId
 import com.cadentic.app.domain.artifacts.ProgressionEntry
 import com.cadentic.app.domain.artifacts.ProgressionLogArtifact
 import com.cadentic.app.domain.artifacts.ProgressionSet
@@ -88,7 +90,7 @@ class ArtifactRepositoryTest {
     fun `a newer schemaVersion is refused by name, never half-read`() {
         repositoryIn(dir()).writeProfile(profile)
         val f = File(dir(), ArtifactId.ATHLETE_PROFILE.fileName)
-        f.writeText(f.readText().replace("\"schemaVersion\": 1", "\"schemaVersion\": 99"))
+        f.writeText(f.readText().replace("\"schemaVersion\": $ARTIFACT_SCHEMA_VERSION", "\"schemaVersion\": 99"))
 
         val error = assertThrowsArtifactError { repositoryIn(dir()).readProfile() }
         assertTrue(error is ArtifactError.UnsupportedSchemaVersion)
@@ -183,6 +185,47 @@ class ArtifactRepositoryTest {
         }
         assertTrue(error is ArtifactError.Missing)
         assertEquals(ArtifactId.ATHLETE_GOALS, error.artifact)
+    }
+
+    // --- Schema migration ---------------------------------------------------
+
+    @Test
+    fun `a v1 calendar folds its imported fixtures into one-offs`() {
+        dir().mkdirs()
+        // Exactly what v1 wrote, back when league games were a separate kind.
+        File(dir(), ArtifactId.BLOCKER_CALENDAR.fileName).writeText(
+            """
+            {
+              "schemaVersion": 1,
+              "updatedAt": "2026-08-26T09:00:00Z",
+              "recurring": [
+                { "id": 14, "label": "Team practice", "days": ["TUESDAY", "THURSDAY"],
+                  "timeRange": "19:00–20:30", "strain": "MEDIUM" }
+              ],
+              "fixtures": [
+                { "id": 1, "date": "2026-08-29", "label": "Round 1", "strain": "HARD" },
+                { "id": 2, "date": "2026-09-04", "label": "Round 2", "strain": "MEDIUM" }
+              ],
+              "fixtureSourceLabel": "Season schedule",
+              "oneOffs": [
+                { "id": 15, "date": "2026-09-12", "label": "Travel day", "strain": "LIGHT" }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val calendar = repositoryIn(dir()).readBlockerCalendar()!!
+
+        // Nothing is lost, and the athlete's own strain edits come with it.
+        assertEquals(
+            listOf("Round 1", "Round 2", "Travel day"),
+            calendar.oneOffs.map { it.label },
+        )
+        assertEquals(Strain.MEDIUM, calendar.oneOffs.single { it.label == "Round 2" }.strain)
+        assertEquals("Team practice", calendar.recurring.single().label)
+        // Ids survive the fold, so the counter still re-seeds above the highest one.
+        assertEquals(listOf(1L, 2L, 15L), calendar.oneOffs.map { it.id })
+        assertEquals(15L, calendar.highestId)
     }
 
     // --- Story 5: the progression log --------------------------------------

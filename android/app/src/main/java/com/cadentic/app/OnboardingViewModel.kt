@@ -45,7 +45,7 @@ private const val GENERATION_MS = 4200L
 
 class OnboardingViewModel(
     private val repository: ArtifactRepository,
-    // One clock read: the grid anchor and the seeded fixtures must agree even across midnight.
+    // One clock read: the grid anchor and the seeded game days must agree even across midnight.
     val today: LocalDate = LocalDate.now(),
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
@@ -92,7 +92,7 @@ class OnboardingViewModel(
     /**
      * Artifacts win over the seeded persona draft, field-group by field-group. The persona
      * seed is only built when **no blocker-calendar artifact exists** — otherwise every
-     * launch would push a fresh set of fixtures into a calendar the athlete has already
+     * launch would push a fresh set of game days into a calendar the athlete has already
      * edited. A half-finished onboarding restores what was completed and leaves the rest at
      * its defaults; the athlete resumes at step 1 with those steps prefilled (no step
      * pointer is persisted — nothing downstream needs one).
@@ -187,18 +187,7 @@ class OnboardingViewModel(
     // look-alike blockers (same day, same label, same strain) be edited or deleted as one.
     // Ids survive process death: they are persisted and the counter is re-seeded on launch.
 
-    /** Correct how much a league game costs this athlete — the import stays authoritative on dates. */
-    fun setFixtureStrain(id: Long, strain: Strain) = update {
-        copy(constraints = constraints.copy(
-            fixtures = constraints.fixtures.map { if (it.id == id) it.copy(strain = strain) else it }
-        ))
-    }
-
-    /** The athlete isn't playing this fixture — drop it from the plan. */
-    fun removeFixture(id: Long) = update {
-        copy(constraints = constraints.copy(fixtures = constraints.fixtures.filterNot { it.id == id }))
-    }
-
+    /** Seeded game days are one-offs too, so this is how "I'm not playing this one" works. */
     fun updateOneOff(id: Long, label: String, strain: Strain) = update {
         copy(constraints = constraints.copy(
             oneOffs = constraints.oneOffs.map {

@@ -2,7 +2,6 @@ package com.cadentic.app
 
 import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Constraints
-import com.cadentic.app.domain.Fixture
 import com.cadentic.app.domain.Ids
 import com.cadentic.app.domain.OnboardingDraft
 import com.cadentic.app.domain.OneOffBlocker
@@ -153,7 +152,7 @@ class ArtifactMappingTest {
     // --- Story 4: blocker calendar -----------------------------------------
 
     @Test
-    fun `all three blocker kinds, their strain, and the fixture source are persisted`() {
+    fun `both blocker kinds and their strain are persisted`() {
         val constraints = Constraints(
             recurring = listOf(
                 RecurringBlocker(
@@ -161,31 +160,27 @@ class ArtifactMappingTest {
                     setOf(DayOfWeek.THURSDAY, DayOfWeek.TUESDAY), "19:00–20:30", Strain.MEDIUM,
                 ),
             ),
-            fixtures = listOf(Fixture(Ids.next(), TODAY.plusDays(11), "League game", Strain.HARD)),
-            fixtureSourceLabel = "Season schedule",
-            oneOffs = listOf(OneOffBlocker(Ids.next(), TODAY.plusDays(17), "Travel day", Strain.LIGHT)),
+            oneOffs = listOf(
+                OneOffBlocker(Ids.next(), TODAY.plusDays(11), "League game", Strain.HARD),
+                OneOffBlocker(Ids.next(), TODAY.plusDays(17), "Travel day", Strain.LIGHT),
+            ),
         )
 
         val artifact = constraints.toArtifact(now)
 
-        assertEquals("Season schedule", artifact.fixtureSourceLabel)
         assertEquals(Strain.MEDIUM, artifact.recurring.single().strain)
         assertEquals("19:00–20:30", artifact.recurring.single().timeRange)
-        assertEquals(Strain.HARD, artifact.fixtures.single().strain)
-        assertEquals(Strain.LIGHT, artifact.oneOffs.single().strain)
+        assertEquals(listOf(Strain.HARD, Strain.LIGHT), artifact.oneOffs.map { it.strain })
         // Canonical Mon→Sun regardless of the order the athlete tapped the chips.
         assertEquals(listOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), artifact.recurring.single().days)
     }
 
     @Test
-    fun `fixtures are serialized in canonical date order`() {
-        val late = Fixture(Ids.next(), TODAY.plusDays(20), "Round 3", Strain.HARD)
-        val early = Fixture(Ids.next(), TODAY.plusDays(2), "Round 1", Strain.HARD)
-        val constraints = Constraints(
-            recurring = emptyList(), fixtures = listOf(late, early),
-            fixtureSourceLabel = "Season schedule", oneOffs = emptyList(),
-        )
+    fun `one-offs are serialized in canonical date order`() {
+        val late = OneOffBlocker(Ids.next(), TODAY.plusDays(20), "Round 3", Strain.HARD)
+        val early = OneOffBlocker(Ids.next(), TODAY.plusDays(2), "Round 1", Strain.HARD)
+        val constraints = Constraints(recurring = emptyList(), oneOffs = listOf(late, early))
 
-        assertEquals(listOf("Round 1", "Round 3"), constraints.toArtifact(now).fixtures.map { it.label })
+        assertEquals(listOf("Round 1", "Round 3"), constraints.toArtifact(now).oneOffs.map { it.label })
     }
 }

@@ -167,7 +167,7 @@ class ArtifactsOnDeviceTest {
         assertEquals(today, ok.payload.requestDate)
         assertEquals(27, ok.payload.profile.age)
         assertEquals(listOf(Category.CARDIO, Category.EXPLOSIVENESS), ok.payload.goals.focusThisCycle)
-        assertEquals("Season schedule", ok.payload.blockerCalendar.fixtureSourceLabel)
+        assertEquals("Team practice", ok.payload.blockerCalendar.recurring.single().label)
         assertFalse("local ids must not reach the engine", ok.json.toString().contains("\"id\""))
     }
 

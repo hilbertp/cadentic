@@ -18,12 +18,15 @@ import java.time.LocalDate
  * LLM request from. They are the binding contract of Epic 1; the storage tech behind them
  * ([JsonArtifactRepository]) is not.
  *
+ * v2 dropped the blocker calendar's separate `fixtures` kind and its `fixtureSourceLabel`:
+ * league games are one-off blockers like any other. v1 documents are migrated on read.
+ *
  * Every artifact carries [ARTIFACT_SCHEMA_VERSION] and an `updatedAt` stamp. Property
  * declaration order *is* the serialized key order (kotlinx.serialization), and every
  * collection is written in a canonical order by [toArtifact] — so two writes of equal data
  * differ only in `updatedAt`.
  */
-const val ARTIFACT_SCHEMA_VERSION: Int = 1
+const val ARTIFACT_SCHEMA_VERSION: Int = 2
 
 /** Names used for errors and for the on-disk file names. */
 enum class ArtifactId(val fileName: String) {
@@ -115,14 +118,6 @@ data class RecurringBlockerRecord(
 )
 
 @Serializable
-data class FixtureRecord(
-    val id: Long,
-    val date: LocalDate,
-    val label: String,
-    val strain: Strain,
-)
-
-@Serializable
 data class OneOffBlockerRecord(
     val id: Long,
     val date: LocalDate,
@@ -130,14 +125,12 @@ data class OneOffBlockerRecord(
     val strain: Strain,
 )
 
+/** Two kinds only: what repeats weekly, and what lands on a single date. */
 @Serializable
 data class BlockerCalendarArtifact(
     val schemaVersion: Int = ARTIFACT_SCHEMA_VERSION,
     val updatedAt: Instant,
     val recurring: List<RecurringBlockerRecord>,
-    val fixtures: List<FixtureRecord>,
-    /** Provenance of the imported fixtures ("Season schedule"). */
-    val fixtureSourceLabel: String,
     val oneOffs: List<OneOffBlockerRecord>,
 )
 

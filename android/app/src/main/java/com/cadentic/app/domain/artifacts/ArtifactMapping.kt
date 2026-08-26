@@ -2,7 +2,6 @@ package com.cadentic.app.domain.artifacts
 
 import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Constraints
-import com.cadentic.app.domain.Fixture
 import com.cadentic.app.domain.Ids
 import com.cadentic.app.domain.OnboardingDraft
 import com.cadentic.app.domain.OneOffBlocker
@@ -82,10 +81,6 @@ fun Constraints.toArtifact(now: Instant): BlockerCalendarArtifact =
         recurring = recurring
             .sortedBy { it.id }
             .map { RecurringBlockerRecord(it.id, it.label, it.days.sorted(), it.timeRange, it.strain) },
-        fixtures = fixtures
-            .sortedWith(compareBy({ it.date }, { it.id }))
-            .map { FixtureRecord(it.id, it.date, it.label, it.strain) },
-        fixtureSourceLabel = fixtureSourceLabel,
         oneOffs = oneOffs
             .sortedWith(compareBy({ it.date }, { it.id }))
             .map { OneOffBlockerRecord(it.id, it.date, it.label, it.strain) },
@@ -96,8 +91,6 @@ fun Constraints.toArtifact(now: Instant): BlockerCalendarArtifact =
 fun BlockerCalendarArtifact.toConstraints(): Constraints =
     Constraints(
         recurring = recurring.map { RecurringBlocker(it.id, it.label, it.days.toSet(), it.timeRange, it.strain) },
-        fixtures = fixtures.map { Fixture(it.id, it.date, it.label, it.strain) },
-        fixtureSourceLabel = fixtureSourceLabel,
         oneOffs = oneOffs.map { OneOffBlocker(it.id, it.date, it.label, it.strain) },
     )
 
@@ -111,7 +104,6 @@ fun BlockerCalendarArtifact.toConstraints(): Constraints =
 val BlockerCalendarArtifact.highestId: Long
     get() = maxOf(
         recurring.maxOfOrNull { it.id } ?: 0L,
-        fixtures.maxOfOrNull { it.id } ?: 0L,
         oneOffs.maxOfOrNull { it.id } ?: 0L,
     )
 
