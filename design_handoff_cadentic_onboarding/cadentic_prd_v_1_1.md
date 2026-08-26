@@ -106,6 +106,8 @@ The artifact split is a **business decomposition by change cadence**, not a stor
 
 Placement note: injuries/constraints and experience level are assigned to Athlete Status because they evolve the way status does (slowly, ideally improving). This placement was delegated to whatever makes sense and can be revisited.
 
+MVP note (2026-08-26, confirmed by the product owner): **row 2's free-text long-term goals are not captured for MVP.** The shipped onboarding is a 4-step wizard, not the conversational goal interview of §9 — it captures ranked performance priorities plus the longevity/performance lane, and those stand in for long-term goals. No free text reaches the Athlete Goals artifact or the mesocycle engine's request payload. Revisit if and when the goal interview is built.
+
 ### 5.3 Modules
 
 | Module | Kind | Responsibility |
@@ -251,6 +253,8 @@ Conversational agent chat flow to define → Athlete Goals (and injury/constrain
 - Trade-offs ("I want longevity first, so pushing into unhealthy territory to max performance is unacceptable")
 - Injuries ("I have a dislocated disk in the lower back and I have ankle instability")
 - Practices ("I want to train in the gym, I have access to an Olympic lifting area, I train endurance in the pool")
+
+MVP note (2026-08-26): shipped as a ranked-priority screen rather than a chat flow. Priorities, trade-offs (as the longevity/performance lane) and injuries are captured; free-text long-term goals are deferred (see §5.2). Practices and equipment are deferred too — the mesocycle layer prescribes no exercises (§5.1), so they are the daily-prescription layer's input.
 
 ### Step 3: Blockers
 

@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.cadentic.app.data.JsonArtifactRepository
 import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Ids
+import com.cadentic.app.domain.Lane
 import com.cadentic.app.domain.Status
 import com.cadentic.app.domain.Strain
 import com.cadentic.app.domain.artifacts.ArtifactId
@@ -48,6 +49,15 @@ class ArtifactsOnDeviceTest {
     /** The ViewModel reads and writes on the main thread, exactly as the app does. */
     private fun onMain(block: () -> Unit) = instrumentation.runOnMainSync(block)
 
+    private fun waitUntil(what: String, timeoutMs: Long = 15_000, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return
+            Thread.sleep(100)
+        }
+        throw AssertionError("timed out waiting for $what")
+    }
+
     @Test
     fun onboardingWritesArtifactsThatSurviveAProcessRestart() {
         lateinit var first: OnboardingViewModel
@@ -89,6 +99,51 @@ class ArtifactsOnDeviceTest {
             "Travel day",
             relaunched.draft.constraints.oneOffs.single { it.id == twins[1].id }.label,
         )
+    }
+
+    /**
+     * Story 7's second half: a restart mid-onboarding must not turn into a slow reset. The
+     * steps completed before the kill keep their values while the remaining ones are filled
+     * in, right through generation and approval.
+     */
+    @Test
+    fun finishingOnboardingAfterARestartDoesNotRevertTheEarlierSteps() {
+        onMain {
+            val first = OnboardingViewModel(repository(), today)
+            first.setAge("41")
+            first.setHeight("176")
+            first.continueFromStep(1)
+        }
+
+        // --- process restart, mid-onboarding ---
+        Ids.resetForTests()
+        lateinit var vm: OnboardingViewModel
+        onMain { vm = OnboardingViewModel(repository(), today) }
+        assertEquals("41", vm.draft.profile.age)
+        assertEquals(1, vm.step)
+
+        onMain {
+            vm.continueFromStep(1)
+            vm.setLane(Lane.PERFORMANCE)
+            vm.addInjury("Left knee — meniscus")
+            vm.continueFromStep(2)
+            vm.continueFromStep(3)
+        }
+        // Generation runs for real on device (~4.2s) before the proposal can be approved.
+        waitUntil("the proposal to arrive") { vm.draft.status == Status.PROPOSED }
+        onMain { vm.approve() }
+        assertEquals(Status.APPROVED, vm.draft.status)
+
+        // Step 1's data is untouched by everything that came after it.
+        val profile = repository().readProfile()!!
+        assertEquals(41, profile.age)
+        assertEquals(176, profile.heightCm)
+
+        val goals = repository().readGoals()!!
+        assertEquals(Lane.PERFORMANCE, goals.lane)
+        assertNotNull(goals.lockedForCycle)
+        assertTrue(repository().readStatus()!!.injuries.contains("Left knee — meniscus"))
+        assertTrue(repository().readProgressionLog()!!.entries.isEmpty())
     }
 
     @Test

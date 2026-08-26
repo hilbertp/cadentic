@@ -93,9 +93,60 @@ nothing is lost, and the future Mesocycle Engine reads artifacts, never UI state
 | `progression-log.json` | at approval | empty; schema fixed for the daily-tracking epic |
 
 `MesoRequestAssembler.assemble(requestDate)` composes the first four into the
-**meso-request payload** — nested per-artifact sections plus an injected
-`requestDate` — and fails with an error naming the artifact and field rather than
-handing over a partial one.
+**meso-request payload** and fails with an error naming the artifact and field
+rather than handing over a partial one. The progression log deliberately does not
+feed it — the PRD routes that to the History Engine and Mesocycle Tracker.
+
+### The meso-request payload
+
+The contract the Mesocycle Engine will build its prompt from. Nested per artifact,
+ids stripped, `requestDate` injected at composition time:
+
+```json
+{
+  "schemaVersion": 1,
+  "requestDate": "2026-08-26",
+  "profile": { "age": 27, "sex": "MALE", "heightCm": 191, "weightKg": 88.0 },
+  "goals": {
+    "lane": "LONGEVITY",
+    "priorities": ["CARDIO", "EXPLOSIVENESS", "STRENGTH"],
+    "focusCount": 2,
+    "focusThisCycle": ["CARDIO", "EXPLOSIVENESS"],
+    "queuedForLater": ["STRENGTH"],
+    "excluded": ["HYPERTROPHY"]
+  },
+  "status": {
+    "experience": "Advanced — 5–10 years",
+    "selfAssessment": { "CARDIO": "MID", "STRENGTH": "MID", "EXPLOSIVENESS": "LOW", "HYPERTROPHY": null },
+    "injuries": ["Lower-back disc (L4/L5)", "Right ankle instability"]
+  },
+  "blockerCalendar": {
+    "recurring": [
+      { "label": "Team practice", "days": ["TUESDAY", "THURSDAY"], "timeRange": "19:00–20:30", "strain": "MEDIUM" }
+    ],
+    "fixtures": [{ "date": "2026-08-29", "label": "Round 1", "strain": "HARD" }],
+    "fixtureSourceLabel": "Season schedule",
+    "oneOffs": []
+  }
+}
+```
+
+Rules a consumer can rely on:
+
+- **`requestDate` is always present** — the cycle is calendar-anchored and fixtures
+  carry absolute dates, so phases and deloads cannot be laid out without it.
+  Validation fails if it is missing.
+- **`focusCount` ≤ `min(2, priorities.size)`**, enforced both where the artifact is
+  written and again on the payload. `focusThisCycle` and `queuedForLater` are the
+  priority list split at that count.
+- **A `selfAssessment` value of `null` means unknown**, not average. All four
+  categories are always present as keys.
+- **`excluded` categories are a goals decision**, not a status one — an excluded
+  category may still carry a rating in `status.selfAssessment`.
+- **`timeRange` is opaque free text.** Do not parse it.
+- **An empty `blockerCalendar` is valid** — an athlete with nothing booked.
+- Cycle N>1 needs no extra input: the Post-Mesocycle Review updates Status and
+  Goals in place, so a later assembly is the same read of the same four artifacts.
 
 ### Decisions taken here
 

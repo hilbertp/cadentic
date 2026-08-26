@@ -4,7 +4,12 @@ import com.cadentic.app.domain.Category
 import com.cadentic.app.domain.Lane
 import com.cadentic.app.domain.Status
 import com.cadentic.app.domain.Strain
+import com.cadentic.app.domain.artifacts.ArtifactError
+import com.cadentic.app.domain.artifacts.ArtifactException
+import com.cadentic.app.domain.artifacts.ArtifactId
 import com.cadentic.app.domain.artifacts.ArtifactRepository
+import com.cadentic.app.domain.artifacts.AthleteGoalsArtifact
+import com.cadentic.app.domain.artifacts.GoalsLock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -208,7 +213,37 @@ class OnboardingArtifactFlowTest {
         assertEquals("Flight out", after[twins[0].id]!!.label)
         assertEquals("Travel day", after[twins[1].id]!!.label)
         assertEquals(Strain.LIGHT, after[twins[1].id]!!.strain)
+
+        // Deleting one twin must leave the other standing, on disk as well as in memory.
+        relaunched.removeOneOff(twins[0].id)
+        relaunched.continueFromStep(1)
+        assertEquals(listOf(twins[1].id), relaunched.draft.constraints.oneOffs.map { it.id })
+        assertEquals(listOf(twins[1].id), repository().readBlockerCalendar()!!.oneOffs.map { it.id })
     }
+
+    // --- Story 0: the approval write is awaited -----------------------------
+
+    @Test
+    fun `an approval whose lock cannot be written is not confirmed to the athlete`() =
+        runTest(mainDispatcher.dispatcher) {
+            // A store that accepts everything except the one write that makes the approval real.
+            val failing = object : ArtifactRepository by repository() {
+                override fun lockGoals(lock: GoalsLock): AthleteGoalsArtifact =
+                    throw ArtifactException(ArtifactError.WriteFailed(ArtifactId.ATHLETE_GOALS, "disk full"))
+            }
+            val vm = OnboardingViewModel(failing, TODAY, FIXED_CLOCK)
+            vm.continueFromStep(1)
+            vm.continueFromStep(2)
+            vm.continueFromStep(3)
+            advanceUntilIdle()
+
+            vm.approve()
+
+            // The athlete stays on the proposal rather than seeing a lock that does not exist.
+            assertEquals(Status.PROPOSED, vm.draft.status)
+            assertNull(vm.goalsLock)
+            assertNull(repository().readGoals()!!.lockedForCycle)
+        }
 
     @Test
     fun `a blocker added after a restart cannot collide with a persisted id`() =
