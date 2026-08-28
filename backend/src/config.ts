@@ -45,7 +45,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const mode = (env.AUTH_MODE ?? 'A').toUpperCase();
   if (mode !== 'A' && mode !== 'B') throw new Error(`AUTH_MODE must be A or B, got "${env.AUTH_MODE}"`);
 
-  const sharedSecret = env.CADENTIC_SHARED_SECRET ?? '';
+  // Trimmed. A secret arrives from wherever the deployment put it — a file, a shell
+  // pipeline, a secret manager — and `openssl rand -hex 32` alone emits a trailing newline.
+  // The client can never send that byte, so an untrimmed secret is a 401 no request can fix
+  // and nothing on either side reports as a mismatch. Whitespace is not part of a secret.
+  const sharedSecret = (env.CADENTIC_SHARED_SECRET ?? '').trim();
   if (sharedSecret.length < 16) {
     throw new Error(
       'CADENTIC_SHARED_SECRET must be set to at least 16 characters. ' +

@@ -22,6 +22,13 @@ test('a short or missing shared secret refuses to start', () => {
   );
 });
 
+test('a secret with surrounding whitespace still matches', () => {
+  // `openssl rand -hex 32` emits a trailing newline, and piping that into a secret store
+  // produced a 401 that no client could ever satisfy — it cannot send the newline.
+  const c = loadConfig(env({ CADENTIC_SHARED_SECRET: `  ${SECRET}\n` }));
+  assert.equal(c.sharedSecret, SECRET);
+});
+
 test('the dev server binds to loopback unless told otherwise', () => {
   assert.equal(loadConfig(env()).host, '127.0.0.1');
 });

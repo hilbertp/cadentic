@@ -101,7 +101,7 @@ ensure_secret() {          # ensure_secret NAME PROMPT [GENERATOR]
 
 say "Secrets"
 MISSING_SECRET=0
-ensure_secret cadentic-shared-secret "" "openssl rand -hex 32"
+ensure_secret cadentic-shared-secret "" "openssl rand -hex 32 | tr -d '[:space:]'"
 ensure_secret claude-code-oauth-token ""
 [ "$MISSING_SECRET" = "1" ] && exit 1
 
