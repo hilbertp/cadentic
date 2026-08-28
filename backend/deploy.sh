@@ -84,19 +84,26 @@ ensure_secret() {          # ensure_secret NAME PROMPT [GENERATOR]
     eval "$generator" | gcloud secrets versions add "$name" --data-file=- --quiet
     echo "  ${name}: generated"
   else
-    printf '\n  %s\n  ' "$prompt"
-    # -s so the token never appears on screen or in scrollback.
-    read -rs value
-    printf '%s' "$value" | gcloud secrets versions add "$name" --data-file=- --quiet
-    unset value
-    echo "  ${name}: stored"
+    # NOT an interactive prompt. `read` takes a single line, so a token pasted with a
+    # trailing newline splits: the head is consumed and the tail lands on the shell prompt,
+    # in plain view and in history. That happened. Take it from the clipboard instead, where
+    # it never crosses a terminal at all, and strip whitespace so a stray newline is harmless.
+    echo "  ${name}: not set."
+    echo
+    echo "    Copy the token from \`claude setup-token\`, then run:"
+    echo
+    echo "      pbpaste | tr -d '[:space:]' | gcloud secrets versions add ${name} --data-file=-"
+    echo
+    echo "    Re-run this script afterwards; it will skip straight past."
+    MISSING_SECRET=1
   fi
 }
 
 say "Secrets"
+MISSING_SECRET=0
 ensure_secret cadentic-shared-secret "" "openssl rand -hex 32"
-ensure_secret claude-code-oauth-token \
-  "Paste the token from \`claude setup-token\` (input hidden, then press Enter):"
+ensure_secret claude-code-oauth-token ""
+[ "$MISSING_SECRET" = "1" ] && exit 1
 
 say "Granting the runtime service account read access to them"
 SA="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
@@ -137,7 +144,7 @@ URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='valu
 say "Deployed"
 echo "  $URL"
 echo
-echo "  Health:  curl -s $URL/healthz"
+echo "  Health:  curl -s $URL/health"
 echo
 echo "  Build the app against it — note this is the shared secret, printed once so you can"
 echo "  paste it into the Gradle flag. Treat it as a credential:"

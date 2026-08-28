@@ -57,7 +57,10 @@ export function createEngineServer({ config, provider, log = defaultLog }: Serve
   });
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (req.method === 'GET' && req.url === '/healthz') {
+    // `/health`, not `/healthz`: Cloud Run's frontend reserves `/healthz` and answers it
+    // itself with an HTML 404 that never reaches the container — which looks exactly like a
+    // broken deployment and is not one.
+    if (req.method === 'GET' && req.url === '/health') {
       // Deliberately says nothing about credentials, only that the process is up and which
       // mode it is serving — enough to diagnose, nothing worth leaking.
       return sendJson(res, 200, { ok: true, mode: config.mode, model: config.model });

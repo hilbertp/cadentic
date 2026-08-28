@@ -211,9 +211,9 @@ test('a generation that outruns the budget is a timeout', async () => {
   assert.equal((await res.json()).error.code, 'timeout');
 });
 
-test('healthz says what is running without saying anything about credentials', async () => {
+test('health says what is running without saying anything about credentials', async () => {
   const base = await start(new FakeProvider([]));
-  const res = await fetch(`${base}/healthz`);
+  const res = await fetch(`${base}/health`);
   const body: any = await res.json();
   assert.equal(body.ok, true);
   assert.equal(body.mode, 'A');
