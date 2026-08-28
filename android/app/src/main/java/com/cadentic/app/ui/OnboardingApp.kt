@@ -73,7 +73,7 @@ fun OnboardingApp(vm: OnboardingViewModel) {
                 1 -> BaselineScreen(vm)
                 2 -> PrioritiesScreen(vm)
                 3 -> BlockersScreen(vm)
-                4 -> GeneratingScreen()
+                4 -> GeneratingScreen(vm)
                 5 -> ProposalScreen(vm)
                 7 -> GenerationFailedScreen(vm)
                 else -> ApprovedScreen(vm)

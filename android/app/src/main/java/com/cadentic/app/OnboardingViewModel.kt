@@ -43,6 +43,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Instant
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.util.UUID
@@ -85,6 +86,15 @@ class OnboardingViewModel(
     val snackbarFlow = snackbars.receiveAsFlow()
 
     private var generationJob: Job? = null
+
+    /**
+     * When the in-flight generation started, or null when nothing is generating. The
+     * GeneratingScreen counts up from this — it lives here rather than in the composable so
+     * that backgrounding the app and coming back shows the true elapsed time instead of
+     * restarting the clock at zero.
+     */
+    var generationStartedAt by mutableStateOf<Instant?>(null)
+        private set
 
     init {
         bootstrap.error?.let { toast("Saved data can't be read — ${it.message}") }
@@ -294,6 +304,7 @@ class OnboardingViewModel(
         }
 
         update { copy(status = Status.GENERATING, plan = null, generationError = null) }
+        generationStartedAt = clock.instant()
 
         generationJob = viewModelScope.launch {
             when (val outcome = requestPlan()) {
@@ -306,6 +317,7 @@ class OnboardingViewModel(
                     step = 4
                 }
             }
+            generationStartedAt = null
         }
     }
 
@@ -380,6 +392,7 @@ class OnboardingViewModel(
             // and the backend, seeing nobody left waiting, aborts the generation. Walking
             // away does not leave a plan being written for a screen no one is looking at.
             generationJob?.cancel()
+            generationStartedAt = null
             update { copy(status = Status.DRAFT) }
             return true
         }
