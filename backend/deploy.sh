@@ -19,6 +19,34 @@ IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${SERVICE}"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
+# `gcloud services enable` returns before the service is actually usable, and on a brand-new
+# project the first call against it fails with PERMISSION_DENIED — which reads like an IAM
+# problem and is not one. Retry through that window rather than making the operator guess.
+retry() {
+  local what="$1" tries="${2:-12}" n=1
+  shift 2
+  until "$@" >/dev/null 2>&1; do
+    if [ "$n" -ge "$tries" ]; then
+      echo "  ${what}: still failing after ${tries} attempts — running once more to show the error" >&2
+      "$@"
+      return 1
+    fi
+    [ "$n" -eq 1 ] && printf '  %s: not ready yet, waiting' "$what"
+    printf '.'
+    n=$((n + 1))
+    sleep 5
+  done
+  [ "$n" -gt 1 ] && printf ' ready\n'
+  return 0
+}
+
+say "Preflight"
+docker info >/dev/null 2>&1 || {
+  echo "  Docker is not running. Start Docker Desktop and re-run — the image is built locally." >&2
+  exit 1
+}
+echo "  docker: up"
+
 say "Project ${PROJECT}, region ${REGION}"
 gcloud config set project "$PROJECT" >/dev/null
 
@@ -28,6 +56,11 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   secretmanager.googleapis.com \
   --quiet
+
+# Enablement is eventually consistent, so poll a cheap read on each service until it answers.
+retry "artifactregistry" 24 gcloud artifacts repositories list --location "$REGION"
+retry "secretmanager" 24 gcloud secrets list --limit 1
+retry "run" 24 gcloud run services list --region "$REGION"
 
 say "Artifact Registry repository"
 gcloud artifacts repositories describe "$REPO" --location "$REGION" >/dev/null 2>&1 || \
