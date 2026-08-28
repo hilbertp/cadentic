@@ -1,0 +1,6 @@
+# Finder metadata. It appears in every directory anyone browses and belongs in no commit.
+.DS_Store
+._*
+
+# Per-module ignores live next to the module they cover: android/.gitignore and
+# backend/.gitignore. This file is only for what the whole repo shares.
