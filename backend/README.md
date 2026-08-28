@@ -146,6 +146,57 @@ Two options in `provider/agentSdk.ts` are load-bearing and should not be "simpli
   whenever it takes any intermediate step. That is a coin flip, and it lost live. A few turns
   is not a licence to wander: `allowedTools` is empty, so there is nothing to call.
 
+## Deploying to Cloud Run
+
+The dev loop runs this on a laptop, which means the phone only works on the same Wi-Fi. Cloud
+Run fixes that: a public HTTPS endpoint the app reaches from anywhere, scaled to zero so idle
+costs nothing.
+
+```bash
+./backend/deploy.sh <gcp-project-id> [region]
+```
+
+Run it **from the repo root** — the image needs `contracts/` in its build context. It is
+idempotent: it creates what is missing, reuses what is there, and never overwrites or prints
+an existing secret.
+
+Prerequisites, all one-time:
+
+- `gcloud auth login`, and a project with billing enabled (the free tier is applied as a
+  spending-based discount, so a card is required even though this stays free).
+- `claude setup-token`. **Here it is genuinely required** — there is no interactive login on
+  a Cloud Run container for the Agent SDK to resolve, which is precisely the case the token
+  exists for. The script prompts for it with hidden input and stores it in Secret Manager;
+  it is never baked into the image or passed on a command line.
+
+What the deploy settings are for:
+
+| Flag | Why |
+|---|---|
+| `--timeout 600` | Above the backend's own 300s budget, so a slow generation ends as our named `timeout` rather than Cloud Run cutting the connection |
+| `--max-instances 2` | The in-flight request-id join is per instance, and this caps what a runaway could ever spend |
+| `--min-instances 0` | Idle costs nothing. The price is a cold start on the first request after a quiet spell |
+| `--memory 1Gi` | Node plus the extracted CLI |
+
+### Image notes
+
+Two things in the Dockerfile are not incidental:
+
+- **`--platform linux/amd64`.** Cloud Run does not run arm64, and building on an Apple Silicon
+  machine produces arm64 by default — a mistake that only surfaces at deploy time.
+- **The musl CLI build is deleted after `npm ci`.** The SDK ships the Claude Code CLI as
+  per-platform optional packages and npm installs both the glibc and musl variants; on a
+  Debian base the musl one can never execute. Removing it took the image from 1.6 GB to
+  522 MB, which is 1 GB less to pull on every cold start.
+
+### What this exposes
+
+`--allow-unauthenticated` means anyone who knows the URL can reach the endpoint. The shared
+secret is the only thing between a stranger and the owner's Claude subscription — and it is
+compiled into the APK, readable by anyone who unzips it. For a personal test app that is an
+acceptable risk; it stops being one the moment the APK is handed around. Rotate the secret
+(`gcloud secrets versions add cadentic-shared-secret`) and redeploy if that ever happens.
+
 ## Mode B: user-supplied API keys
 
 Not built (Epic 2 story 6). `AUTH_MODE=B` returns the typed `provider-not-available` error the

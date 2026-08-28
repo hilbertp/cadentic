@@ -3,11 +3,16 @@
  * before the socket opens — a backend that starts is a backend that can serve.
  */
 
+import { existsSync } from 'node:fs';
+
 import { assertModeAReady, describeCredential, loadConfig, modeACredentialSource } from './config.js';
 import { assertContractAgreement } from './contract.js';
 import { PROMPT_VERSION } from './generate.js';
 import { providerFor } from './provider/index.js';
 import { createEngineServer } from './server.js';
+
+/** Cloud Run sets K_SERVICE; every Docker container has /.dockerenv. */
+const inContainer = (): boolean => Boolean(process.env.K_SERVICE) || existsSync('/.dockerenv');
 
 function main(): void {
   assertContractAgreement();
@@ -36,10 +41,15 @@ function main(): void {
         `timeout ${Math.round(config.requestTimeoutMs / 1000)}s · ` +
         `startDate window ${config.startDateWindowDays}d`,
     );
-    if (config.host === '0.0.0.0') {
+    // Binding all interfaces is correct in a container — the runtime reaches it through its
+    // own proxy and there is no other network exposure — and wrong on a laptop, where it
+    // offers the endpoint to everything on the Wi-Fi. `K_SERVICE` marks Cloud Run and
+    // `/.dockerenv` marks a plain container, so the warning fires only where it means
+    // something. Checking Cloud Run alone was not enough: local `docker run` tripped it.
+    if (config.host === '0.0.0.0' && !inContainer()) {
       console.warn(
-        'WARNING: bound to 0.0.0.0. The dev server is meant for the private network only — ' +
-          'set HOST to your LAN address instead.',
+        'WARNING: bound to 0.0.0.0 outside a container. The dev server is meant for the ' +
+          'private network only — set HOST to your LAN address instead.',
       );
     }
   });

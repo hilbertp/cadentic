@@ -1,0 +1,18 @@
+# The backend image builds from the repo root so it can reach `contracts/`. Everything the
+# backend does not need is excluded here — without this the Android build output alone drags
+# hundreds of megabytes into the context.
+
+.git
+.claude
+.DS_Store
+
+android
+design_handoff_cadentic_onboarding
+epics
+
+backend/node_modules
+backend/dist
+backend/test
+backend/.env
+backend/README.md
+**/*.log

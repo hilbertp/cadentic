@@ -45,6 +45,21 @@ android {
         }
         release {
             isMinifyEnabled = false
+            /**
+             * Signed with the **debug** keystore. That is not a real release signing setup and
+             * must not become one — it exists so a personal test build is installable on a
+             * phone at all, since Android refuses unsigned APKs.
+             *
+             * Why bother with a release build: it is the only one with no cleartext
+             * permission. Against an HTTPS engine, a debug build would still carry the
+             * `src/debug/` network config that allows plain HTTP — harmless but untrue of how
+             * the app now talks. Sharing the debug keystore also means this installs over an
+             * existing debug build instead of demanding an uninstall.
+             *
+             * A real release needs its own keystore and `isMinifyEnabled = true`, and neither
+             * is in scope until there is something to distribute.
+             */
+            signingConfig = signingConfigs.getByName("debug")
             // No default: a release build must be pointed at a real, TLS-terminated engine.
             // The cleartext dev host is debug-only and the release manifest does not permit it.
             buildConfigField(
