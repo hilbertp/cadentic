@@ -23,6 +23,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -127,11 +128,23 @@ private fun PhaseTimeline(proposal: Proposal) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                // One line each, ellipsised. The engine picks these names now, and a long
+                // one on a one-week phase used to wrap and push the week label out of the
+                // 46dp row entirely. The contract caps the length; this makes sure an
+                // unusually wide name degrades to "Power buil…" rather than breaking the row.
                 Text(
                     phase.name,
                     style = sans(if (isDeload) 11.sp else 12.sp, FontWeight.SemiBold, color = nameColor),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 3.dp),
                 )
-                Text(phase.weeksLabel, style = sans(10.5.sp, color = weekColor))
+                Text(
+                    phase.weeksLabel,
+                    style = sans(10.5.sp, color = weekColor),
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                )
             }
         }
     }

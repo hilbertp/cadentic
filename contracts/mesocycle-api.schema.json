@@ -178,8 +178,8 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 24,
-          "description": "Display text only. The UI switches on phaseType, never on this."
+          "maxLength": 14,
+          "description": "Display text only — the UI switches on phaseType, never on this. It is rendered inside a timeline segment whose width is proportional to the phase's length, so a one-week phase gets a very narrow box: one or two short words. 14 is not a target, it is a ceiling."
         },
         "weeks": { "type": "integer", "minimum": 1, "maximum": 12 }
       }

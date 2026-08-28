@@ -38,6 +38,14 @@ test('the payload goes into the prompt verbatim', async () => {
   assert.ok(prompt.includes(`"requestDate": "${payload().requestDate}"`));
 });
 
+test('the prompt tells the model why phase names must be short', async () => {
+  // The constraint exists for a layout reason the model cannot see, so saying only "max 14"
+  // would read as arbitrary and invite it right up to the ceiling.
+  const provider = new FakeProvider([{ value: planDraft() }]);
+  await run(provider);
+  assert.ok(provider.prompts[0].includes('One or two short words'));
+});
+
 test('the prompt states no duration band while the owner question is open', async () => {
   const provider = new FakeProvider([{ value: planDraft() }]);
   await run(provider);

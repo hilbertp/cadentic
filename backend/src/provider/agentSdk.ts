@@ -101,7 +101,17 @@ export class AgentSdkProvider implements Provider {
           outputFormat: { type: 'json_schema', schema },
           allowedTools: [],
           permissionMode: 'dontAsk',
-          maxTurns: 1,
+          /**
+           * Not 1. With `outputFormat: json_schema` the answer arrives as an end-turn tool
+           * call, which spends a turn of its own — so a single turn only succeeds when the
+           * model emits the object immediately, and fails with `error_max_turns` whenever it
+           * takes any intermediate step. That is a coin flip, and it failed live.
+           *
+           * A few turns is not a licence to wander: `allowedTools` is empty, so there is
+           * nothing to call and no loop to run away with. The only thing this buys is room
+           * for the model to finish answering.
+           */
+          maxTurns: 4,
           settingSources: [],
           abortController,
         },
@@ -120,7 +130,12 @@ export class AgentSdkProvider implements Provider {
         if (message.type !== 'result') continue;
 
         if (message.subtype !== 'success') {
-          throw this.resultError(message.subtype, (message as any).errors, assistantError);
+          throw this.resultError(
+            message.subtype,
+            (message as any).errors,
+            assistantError,
+            (message as any).terminal_reason,
+          );
         }
 
         if (assistantError || message.is_error) {
@@ -198,7 +213,12 @@ export class AgentSdkProvider implements Provider {
       : new EngineError('provider-unreachable', `Claude could not complete the request (${kind}).`);
   }
 
-  private resultError(subtype: string, errors: string[] | undefined, assistantError?: string): EngineError {
+  private resultError(
+    subtype: string,
+    errors: string[] | undefined,
+    assistantError?: string,
+    terminalReason?: string,
+  ): EngineError {
     if (assistantError) return this.assistantError(assistantError);
     if ((errors ?? []).some(isUsageLimitText)) {
       return new EngineError(
@@ -206,15 +226,26 @@ export class AgentSdkProvider implements Provider {
         'The Claude subscription has hit its usage window. Generation will work again once it resets.',
       );
     }
-    // Structured-output retries are exhausted only after the SDK has already re-asked, so
-    // this is the same condition as a malformed answer twice over.
-    if (subtype === 'error_max_structured_output_retries') {
+    // All three mean the same thing to an athlete: we reached Claude and it did not deliver
+    // a usable plan. `provider-unreachable` would be a lie about every one of them — the
+    // backend got all the way to a result message to read this off.
+    if (
+      subtype === 'error_max_structured_output_retries' ||
+      subtype === 'error_max_turns' ||
+      terminalReason === 'structured_output_retry_exhausted'
+    ) {
       return new EngineError(
         'format-failed',
         'Claude could not produce a plan in the required format.',
       );
     }
-    return new EngineError('provider-unreachable', `Claude ended the session (${subtype}).`);
+    // The subtype alone is a category; `terminal_reason` and the SDK's own error strings are
+    // what actually say why, and a failure that leaves neither in the log cannot be debugged.
+    const why = [terminalReason, ...(errors ?? [])].filter(Boolean).join('; ');
+    return new EngineError(
+      'provider-unreachable',
+      `Claude ended the session (${subtype}${why ? `: ${firstLine(why)}` : ''}).`,
+    );
   }
 
   /** Everything that escapes the SDK becomes a named error. Nothing raw reaches the app. */

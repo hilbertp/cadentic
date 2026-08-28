@@ -101,7 +101,16 @@ export function createEngineServer({ config, provider, log = defaultLog }: Serve
       const error = isEngineError(e)
         ? e
         : new EngineError('provider-unreachable', 'The backend failed to generate a plan.');
-      log({ event: 'failed', requestId, code: error.code, ms: Date.now() - started });
+      // The message too, not just the code. A provider failure never reaches the
+      // generation-attempt log — it throws before there is an attempt to record — so without
+      // it a failure leaves nothing behind but a category, which is not enough to debug.
+      log({
+        event: 'failed',
+        requestId,
+        code: error.code,
+        message: error.message,
+        ms: Date.now() - started,
+      });
       send(res, error);
     }
   }

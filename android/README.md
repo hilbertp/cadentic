@@ -258,6 +258,12 @@ Rules a consumer can rely on:
 
 - **`phaseType` is what you switch on.** `name` is display text the engine chose;
   a plan that calls its first phase "Foundation" still colours as a BASE segment.
+- **`name` is capped at 14 characters**, and the prompt asks for one or two short
+  words. Segment width is proportional to phase length, so a one-week phase is a
+  narrow sliver — the first live plan came back with "Double-fixture unload" on
+  one and it wrapped, pushing the week label out of the row. Even a short name
+  can ellipsise there; the dashed border and the week number carry the meaning,
+  and the coach's note names the deload weeks in full.
 - **Deload timing is a `DELOAD` phase**, not a separate field. One representation.
 - **`intensity` is `null` on a REST day and on no other day type.**
 - **Every week lists all seven days, Monday→Sunday.** A day off is REST, never an

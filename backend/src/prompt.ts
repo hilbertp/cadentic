@@ -21,7 +21,12 @@
 
 import { enumValues, planDraftSchema } from './contract.js';
 
-export const PROMPT_VERSION = 1;
+/**
+ * v2 (2026-08-28): phase-name length. v1 left `name` loose and the first live plan came back
+ * with "Double-fixture unload" on a one-week phase, which overflowed its timeline segment and
+ * clipped the week label under it. The schema now caps it and the prompt says why.
+ */
+export const PROMPT_VERSION = 2;
 
 const list = (name: string) => enumValues(name).join(' | ');
 
@@ -46,9 +51,13 @@ const RULES = `
   \`requestDate\` and within {{WINDOW}} days of it. \`endDate\` is the last day of the last
   week: \`startDate + (durationWeeks x 7) - 1\` days, exactly.
 - **phases** — the arc of the cycle. Each phase has a \`phaseType\` of ${list('PhaseType')},
-  a short display \`name\`, and a whole number of \`weeks\`. The phase weeks must sum to
+  a display \`name\`, and a whole number of \`weeks\`. The phase weeks must sum to
   \`durationWeeks\`. Deload timing is expressed as a DELOAD phase; there is no separate
   deload field.
+  - The \`name\` is drawn inside a timeline segment as wide as the phase is long, so a
+    one-week phase gets a very narrow box. **One or two short words** — "Base", "Deload",
+    "Power build". Not a description of what the phase does; the athlete reads that
+    elsewhere. Fourteen characters is the hard ceiling, not the target.
 - **weeklyStructure** — one entry per week, numbered 1 to \`durationWeeks\` with no gaps.
   Each week lists **all seven days in Monday-to-Sunday order**.
   - \`type\` is one of ${list('DayType')}.

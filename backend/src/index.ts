@@ -3,7 +3,7 @@
  * before the socket opens — a backend that starts is a backend that can serve.
  */
 
-import { assertModeAReady, loadConfig } from './config.js';
+import { assertModeAReady, describeCredential, loadConfig, modeACredentialSource } from './config.js';
 import { assertContractAgreement } from './contract.js';
 import { PROMPT_VERSION } from './generate.js';
 import { providerFor } from './provider/index.js';
@@ -23,8 +23,9 @@ function main(): void {
     if (config.mode === 'A') {
       console.log(
         'MODE A — every request bills the owner\'s Claude subscription.\n' +
+          `  Credential: ${describeCredential(modeACredentialSource())}\n` +
           '  Supported for personal and development use only. A deployment serving accounts\n' +
-          '  other than the token owner\'s must run Mode B.',
+          '  other than the owner\'s must run Mode B.',
       );
     } else {
       console.log('MODE B — user-supplied API keys. (Story 6: not implemented; requests return provider-not-available.)');

@@ -6,7 +6,7 @@
 
 **Where it lives:** `contracts/mesocycle-api.schema.json` (the shared contract), `backend/` (the engine), `android/app/src/main/java/com/cadentic/app/{domain/MesocycleEngine.kt,domain/PlanNarrative.kt,data/HttpMesocycleEngine.kt,domain/artifacts/MesocyclePlan.kt}`. Both READMEs carry the detail.
 
-**Not verified:** Mode A has never been run against a live subscription — that needs a `claude setup-token` the implementor cannot mint. Everything up to the provider seam is tested; the seam itself is exercised only by a fake.
+**Definition of done: met (2026-08-28).** Verified end to end on a real subscription — the shipped onboarding generated a 12-week plan through Claude Opus 5, rendered it in ProposalScreen, persisted `mesocycle-plan.json` on approval, and came back to the approved state after a process kill. ~$0.75 and ~2 minutes per generation.
 
 ## Goal
 
@@ -19,7 +19,9 @@ Take the meso-request payload from Epic 1, send it with a **standard prompt** to
 Your Max plan is not an API key — it's your claude.ai account. But there is a sanctioned way to send prompts through it programmatically:
 
 1. **Log in once, online.** Claude Code authenticates against your claude.ai account via OAuth (browser login). `claude setup-token` mints a **long-lived token** from that login, made for headless use.
-2. **A tiny backend holds that token** (env var `CLAUDE_CODE_OAUTH_TOKEN`) and runs the **Claude Agent SDK** — Claude Code packaged as a library. Every `query()` it makes is billed to your Max subscription. No API key, no separate billing.
+2. **A tiny backend runs the **Claude Agent SDK** — Claude Code packaged as a library. Every `query()` it makes is billed to your Max subscription. No API key, no separate billing.
+
+   **Correction from implementation:** the epic assumed `CLAUDE_CODE_OAUTH_TOKEN` was required. It is not, on your own machine. The Agent SDK spawns Claude Code, which resolves the login you already have — a setup token is for CI and containers, where no interactive login exists. Both reach the same subscription; the token just travels and lasts a year, where a login lives in the keychain and is renewed by signing in again.
 3. **The app never sees the token.** The Android app posts the payload to your backend; the backend asks Claude and returns the validated JSON. (A plan token inside an APK would be as leakable as a shipped API key — same rule as PRD §17.)
 4. **Later, mode B:** a user enters their own Anthropic API key in the app; the same backend endpoint calls the Messages API with the official SDK instead. The engine sits behind a provider interface, so A→B is a config swap, not a rewrite.
 
@@ -245,17 +247,40 @@ decision, not an implementor one.
   and the lane stand in for MVP, and the prompt says nothing about free-text goals because
   the payload carries none.
 
-## Verifying it end to end
+## Running it
 
-Everything below the provider seam is covered by tests that never touch a network or an LLM
-(59 backend, 102 Android). What no test can cover is Mode A against a real subscription,
-because that needs a token only the owner can mint:
+```bash
+cd backend && npm install
+printf 'MODE_A_PERSONAL_USE=true\nCADENTIC_SHARED_SECRET=%s\n' "$(openssl rand -hex 32)" > .env
+npm run dev
+```
 
-1. `claude setup-token` on a machine with a browser; copy the printed token.
-2. `backend/.env`: `CLAUDE_CODE_OAUTH_TOKEN=<token>`, `MODE_A_PERSONAL_USE=true`,
-   `CADENTIC_SHARED_SECRET=$(openssl rand -hex 32)`. Do **not** set `ANTHROPIC_API_KEY`.
-3. `cd backend && npm install && npm run dev`
-4. `cd android && ./gradlew assembleDebug -Pcadentic.engineSharedSecret=<the same secret>`
-5. Install, run onboarding, tap generate.
+On a machine already signed in to Claude Code that is the whole setup — no token to mint.
+Then build the app against it:
 
-That walk is the epic's definition of done, and it is the one step still outstanding.
+```bash
+cd android && ./gradlew installDebug -Pcadentic.engineSharedSecret=<the same secret>
+```
+
+## What the live run found
+
+Two defects that no amount of unit testing would have caught, because both live in the seam
+between this backend and the Agent SDK:
+
+1. **`maxTurns: 1` was a coin flip.** With `outputFormat: json_schema` the answer arrives as
+   an end-turn tool call, which spends a turn of its own. A model that emits the object
+   immediately fits in one turn; a model that takes any intermediate step dies with
+   `error_max_turns`. The first curl run passed and the first app run failed, on identical
+   code. Now 4 — and since `allowedTools` is empty there is nothing for the extra turns to
+   run away with. `error_max_turns` also stopped being reported as `provider-unreachable`,
+   which was a lie: the backend reached Claude perfectly well.
+2. **Phase names overflowed the timeline.** The stub always wrote "Deload"; the real engine
+   wrote "Double-fixture unload" on a *one-week* phase, which wrapped and pushed the week
+   label out of the row. The contract now caps `name` at 14 characters and the prompt
+   explains why (prompt v2), with `maxLines = 1` in the UI as a backstop.
+
+A related consequence worth knowing rather than fixing: segment width is proportional to
+phase length, so a one-week phase in a twelve-week cycle is a narrow sliver and even "Deload"
+ellipsises to "Delo…". The dashed border marks it as a deload, the week number sits under it,
+and the coach's note names the deload weeks in full — nothing is lost, and widening it would
+mean redesigning a screen this epic deliberately left alone.

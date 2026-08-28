@@ -89,24 +89,48 @@ A Max plan is not an API key — it is a claude.ai account. The sanctioned way t
 programmatically is the **Claude Agent SDK**, which is Claude Code as a library. The raw
 Messages API rejects subscription tokens outright, so there is no lighter shortcut.
 
-One-time setup, on a machine with a browser:
+There are two ways to give it that account, and neither is more official than the other —
+they are the same subscription reached differently.
+
+**On your own machine: nothing to do.** The Agent SDK spawns Claude Code, which resolves the
+credential you already signed in with. If you can run `claude`, the backend can generate.
+Set `MODE_A_PERSONAL_USE=true` and start it. This is the normal case for a dev backend, and
+minting a token to sit beside a login you already have would authenticate the same account
+twice.
+
+**Where there is no interactive login** — CI, a container, a server — mint a portable one:
 
 ```bash
 claude setup-token
 ```
 
 It opens the same browser flow as `/login` and prints a one-year OAuth token
-(`sk-ant-oat01-…`) **once** — it is saved nowhere. Copy it into `.env` as
-`CLAUDE_CODE_OAUTH_TOKEN`, and set `MODE_A_PERSONAL_USE=true`.
+(`sk-ant-oat01-…`) **once**; it is saved nowhere. Put it in `.env` as
+`CLAUDE_CODE_OAUTH_TOKEN`.
+
+The trade-off is lifetime and reach. A `/login` credential expires and is renewed by signing
+in again, and it lives in the OS keychain, so it works only for the same user on the same
+machine. A setup token travels and lasts a year. The backend logs which one it is using at
+startup.
 
 > **Personal and development use only.** Running a subscription token through the Agent SDK
 > headless is supported on that basis. Any deployment serving accounts other than the token
 > owner's must run Mode B with per-user API keys. The backend refuses to start in Mode A
 > without the acknowledgement flag, and logs the constraint at every startup.
 
-**Do not set `ANTHROPIC_API_KEY`.** It outranks `CLAUDE_CODE_OAUTH_TOKEN` in Claude Code's
-credential order, so requests would silently bill the API instead of the subscription. The
-backend refuses to start in Mode A if it finds one.
+**Several environment variables outrank the subscription** and would quietly bill something
+else — the backend would start, requests would succeed, and the money would land somewhere
+you did not intend. Mode A refuses to start if it finds any of them:
+
+| Variable | Would bill |
+|---|---|
+| `CLAUDE_CODE_USE_BEDROCK` / `_VERTEX` / `_FOUNDRY` | That cloud account |
+| `ANTHROPIC_AUTH_TOKEN` | Wherever the bearer token points |
+| `ANTHROPIC_API_KEY` | The Claude API |
+| `ANTHROPIC_PROFILE` | A Console/API organization — same browser flow, different bill |
+| `ANTHROPIC_FEDERATION_RULE_ID` + `ANTHROPIC_ORGANIZATION_ID` | An API organization |
+
+A silent wrong answer here is worse than a refusal, which is why it is a refusal.
 
 Two options in `provider/agentSdk.ts` are load-bearing and should not be "simplified" away:
 
@@ -116,6 +140,11 @@ Two options in `provider/agentSdk.ts` are load-bearing and should not be "simpli
 - **`allowedTools: []` with `permissionMode: 'dontAsk'`** — this is a reasoning task with no
   filesystem or network in it. Nothing is pre-approved, and a tool attempt is denied
   immediately rather than hanging on a prompt no one is there to answer.
+- **`maxTurns: 4`, and specifically not 1.** With `outputFormat: json_schema` the answer
+  arrives as an end-turn tool call, which spends a turn of its own — so one turn only
+  succeeds when the model emits the object immediately, and fails with `error_max_turns`
+  whenever it takes any intermediate step. That is a coin flip, and it lost live. A few turns
+  is not a licence to wander: `allowedTools` is empty, so there is nothing to call.
 
 ## Mode B: user-supplied API keys
 

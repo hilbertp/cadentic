@@ -34,6 +34,22 @@ test('an exercise smuggled onto a day is rejected', () => {
   assert.ok(failures.some((f) => f.includes('exercise')), failures.join('; '));
 });
 
+test('a phase name too long for its timeline segment is rejected', () => {
+  // The first live plan came back with "Double-fixture unload" on a one-week phase, which
+  // overflowed its segment and clipped the week label under it. The contract now caps the
+  // length, so an over-long name is a re-request rather than a broken row.
+  const draft: any = planDraft();
+  draft.phases[2].name = 'Double-fixture unload';
+  const failures = schemaFailures(draft);
+  assert.ok(failures.some((f) => f.includes('phases/2') || f.includes('phases.2')), failures.join('; '));
+});
+
+test('a short phase name is fine', () => {
+  const draft: any = planDraft();
+  draft.phases[2].name = 'Power build';
+  assert.deepEqual(schemaFailures(draft), []);
+});
+
 test('a day type outside the enum is rejected', () => {
   const draft: any = planDraft();
   draft.weeklyStructure[0].days[0].type = 'GAME';
