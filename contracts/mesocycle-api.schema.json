@@ -234,7 +234,10 @@
         "lane", "focus", "queued", "phases", "weeklyStructure", "progression"
       ],
       "properties": {
-        "startDate": { "$ref": "#/$defs/IsoDate" },
+        "startDate": {
+          "$ref": "#/$defs/IsoDate",
+          "description": "Must be a Monday. Every week in weeklyStructure runs Monday to Sunday, so the grid is only coherent off a Monday start."
+        },
         "endDate": { "$ref": "#/$defs/IsoDate" },
         "durationWeeks": { "type": "integer", "minimum": 1, "maximum": 52 },
         "sessionsPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
@@ -295,7 +298,10 @@
       "properties": {
         "schemaVersion": { "type": "integer", "const": 1 },
         "generatedBy": { "$ref": "#/$defs/GeneratedBy" },
-        "startDate": { "$ref": "#/$defs/IsoDate" },
+        "startDate": {
+          "$ref": "#/$defs/IsoDate",
+          "description": "Must be a Monday. Every week in weeklyStructure runs Monday to Sunday, so the grid is only coherent off a Monday start."
+        },
         "endDate": { "$ref": "#/$defs/IsoDate" },
         "durationWeeks": { "type": "integer", "minimum": 1, "maximum": 52 },
         "sessionsPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },

@@ -50,7 +50,7 @@ const week = (n: number) => ({
 
 export const DURATION_WEEKS = 8;
 
-export const planDraft = (over: Record<string, unknown> = {}) => ({
+const planDraftBase = () => ({
   startDate: '2026-09-07',
   // Eight weeks = 56 days, so the last day is start + 55.
   endDate: '2026-11-01',
@@ -70,8 +70,32 @@ export const planDraft = (over: Record<string, unknown> = {}) => ({
     intraWeek: 'Hardest day mid-week, easing into the weekend fixture.',
     interWeek: 'Volume climbs for three weeks, then steps back before the peak.',
   },
-  ...over,
 });
+
+export const planDraft = (over: Record<string, unknown> = {}) => {
+  const draft: any = {
+    ...planDraftBase(),
+    ...over,
+  };
+  // A DELOAD week must be genuinely lighter (validate.ts): downgrade its HARD days so the
+  // canonical fixture stays a plan that passes every layer. Derived from the final phase
+  // list, so a test that overrides phases keeps control of its own weeks.
+  let week = 1;
+  for (const phase of draft.phases ?? []) {
+    if (phase.phaseType === 'DELOAD') {
+      for (let i = 0; i < phase.weeks; i += 1) {
+        const wk = draft.weeklyStructure?.[week - 1 + i];
+        if (wk) {
+          wk.days = wk.days.map((d: any) =>
+            d.intensity === 'HARD' ? { ...d, intensity: 'LIGHT' } : d,
+          );
+        }
+      }
+    }
+    week += phase.weeks;
+  }
+  return draft;
+};
 
 /** A provider that answers from a script. Nothing here ever reaches Claude. */
 export class FakeProvider implements Provider {

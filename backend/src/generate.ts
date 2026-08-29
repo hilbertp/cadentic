@@ -36,6 +36,12 @@ export async function generatePlan(input: GenerateInput): Promise<MesocyclePlan>
     lane: payload.goals.lane,
     focusThisCycle: payload.goals.focusThisCycle,
     queuedForLater: payload.goals.queuedForLater,
+    hardBlockerDates: (payload.blockerCalendar?.oneOffs ?? [])
+      .filter((o: any) => o.strain === 'HARD')
+      .map((o: any) => o.date),
+    hardBlockerDays: (payload.blockerCalendar?.recurring ?? [])
+      .filter((r: any) => r.strain === 'HARD')
+      .flatMap((r: any) => r.days),
   };
 
   const basePrompt = buildPrompt({ payload, startDateWindowDays });

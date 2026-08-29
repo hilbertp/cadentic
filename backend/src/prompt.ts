@@ -25,8 +25,16 @@ import { enumValues, planDraftSchema } from './contract.js';
  * v2 (2026-08-28): phase-name length. v1 left `name` loose and the first live plan came back
  * with "Double-fixture unload" on a one-week phase, which overflowed its timeline segment and
  * clipped the week label under it. The schema now caps it and the prompt says why.
+ *
+ * v3 (2026-08-28): the structural rules the sports-science layering review made explicit.
+ * The mesocycle owns frequency, day types, and where intensity lands; the daily layer owns
+ * dose. Three checkable consequences — a Monday start (the weekly grid is Mon–Sun),
+ * genuinely lighter DELOAD weeks, and no HARD training on a day already carrying a HARD
+ * commitment — were being delivered by the model unprompted in every live plan, which made
+ * them exactly what this codebase refuses to leave prompt-hoped. Now stated here and
+ * enforced by the validator.
  */
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 const list = (name: string) => enumValues(name).join(' | ');
 
@@ -48,12 +56,17 @@ const RULES = `
 - **durationWeeks** — how many weeks this cycle runs. Choose what the athlete's situation
   warrants. There is no required range.
 - **startDate / endDate** — the cycle's calendar span. \`startDate\` must be on or after
-  \`requestDate\` and within {{WINDOW}} days of it. \`endDate\` is the last day of the last
-  week: \`startDate + (durationWeeks x 7) - 1\` days, exactly.
+  \`requestDate\`, within {{WINDOW}} days of it, **and must be a Monday** — every week in
+  this plan runs Monday to Sunday, so a mid-week start would put week 1's leading days
+  before the cycle exists. \`endDate\` is the last day of the last week:
+  \`startDate + (durationWeeks x 7) - 1\` days, exactly.
 - **phases** — the arc of the cycle. Each phase has a \`phaseType\` of ${list('PhaseType')},
   a display \`name\`, and a whole number of \`weeks\`. The phase weeks must sum to
   \`durationWeeks\`. Deload timing is expressed as a DELOAD phase; there is no separate
   deload field.
+  - **A DELOAD week must be genuinely lighter**: no HARD days anywhere in it, and no more
+    training days than a typical week. A "deload" that trains as hard as a normal week is
+    rejected as a structural contradiction.
   - The \`name\` is drawn inside a timeline segment as wide as the phase is long, so a
     one-week phase gets a very narrow box. **One or two short words** — "Base", "Deload",
     "Power build". Not a description of what the phase does; the athlete reads that
@@ -81,6 +94,9 @@ const RULES = `
   \`blockerCalendar\`, and the app draws them onto the calendar itself. Plan *around* them:
   a hard one-off on Saturday is a reason for what you put on Friday and Sunday, never
   something you re-state as a training day.
+  - **A day already carrying a HARD commitment must not be a HARD training day.** The
+    athlete pays for that day once, at the game or the commitment. Give it REST, RECOVERY,
+    or light work.
 - **No coaching voice, headline, or summary.** The app composes what the athlete reads from
   the structure you return. Extra fields are rejected.
 

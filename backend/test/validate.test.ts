@@ -14,6 +14,8 @@ const request = {
   lane: 'LONGEVITY',
   focusThisCycle: ['CARDIO', 'EXPLOSIVENESS'],
   queuedForLater: ['STRENGTH'],
+  hardBlockerDates: [] as string[],
+  hardBlockerDays: [] as string[],
 };
 
 const failuresFor = (over: Record<string, unknown>) =>
@@ -114,20 +116,84 @@ test('the modal training-day count ignores an atypical deload week', () => {
   assert.deepEqual(planFailures(draft, request, 14), []);
 });
 
+// --- The layering's structural rules (sports-science review, 2026-08-28) ---
+
+test('the cycle must start on a Monday', () => {
+  // The weekly grid runs Monday to Sunday; a Tuesday start would give week 1 a Monday that
+  // precedes the cycle itself.
+  const failures = failuresFor({ startDate: '2026-09-08', endDate: '2026-11-02' });
+  assert.ok(failures.some((f) => f.includes('must start on a Monday')), failures.join('; '));
+});
+
+test('a deload week may not contain a HARD day', () => {
+  const draft: any = planDraft();
+  // Week 7 is the fixture's DELOAD week, kept HARD-free by the fixture itself. Break that.
+  draft.weeklyStructure[6].days[0].intensity = 'HARD';
+  assert.ok(
+    planFailures(draft, request, 14).some((f) => f.includes('DELOAD phase but contains 1 HARD')),
+  );
+});
+
+test('a deload week may not train more than a typical week', () => {
+  const draft: any = planDraft();
+  // Seven light training days is still not a deload when the typical week has five.
+  draft.weeklyStructure[6].days = draft.weeklyStructure[6].days.map((d: any) => ({
+    ...d,
+    type: d.type === 'REST' ? 'RECOVERY' : d.type,
+    intensity: 'LIGHT',
+  }));
+  const failures = planFailures(draft, request, 14);
+  assert.ok(failures.some((f) => f.includes("more than the typical week's 5")), failures.join('; '));
+});
+
+test('a HARD training day may not land on a HARD commitment', () => {
+  // Week 1's Friday (2026-09-11) is HARD in the fixture; give the athlete a game that day.
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, hardBlockerDates: ['2026-09-11'] },
+    14,
+  );
+  assert.ok(
+    failures.some((f) => f.includes('2026-09-11') && f.includes('HARD commitment')),
+    failures.join('; '),
+  );
+});
+
+test('a HARD commitment on a rest or lighter day restricts nothing', () => {
+  // Wednesday is REST in the fixture — the athlete pays for the game, the plan already yields.
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, hardBlockerDates: ['2026-09-09'] },
+    14,
+  );
+  assert.deepEqual(failures, []);
+});
+
+test('a HARD recurring commitment blocks that weekday every week', () => {
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, hardBlockerDays: ['FRIDAY'] },
+    14,
+  );
+  // Every non-deload week has a HARD Friday; the deload week was already downgraded.
+  assert.equal(failures.length, 7);
+  assert.ok(failures.every((f) => f.includes('FRIDAY')));
+});
+
 // --- Cross-request layer ---------------------------------------------------
 
 test('a start date before the request date is rejected', () => {
-  const failures = failuresFor({ startDate: '2026-08-25', endDate: '2026-10-19' });
+  const failures = failuresFor({ startDate: '2026-08-24', endDate: '2026-10-18' });
   assert.ok(failures.some((f) => f.includes('is before requestDate')));
 });
 
 test('a start date beyond the window is rejected, never moved', () => {
-  const failures = failuresFor({ startDate: '2026-09-30', endDate: '2026-11-24' });
+  const failures = failuresFor({ startDate: '2026-10-05', endDate: '2026-11-29' });
   assert.ok(failures.some((f) => f.includes('must be within 14')));
 });
 
 test('the window is tunable', () => {
-  const draft = planDraft({ startDate: '2026-09-30', endDate: '2026-11-24' });
+  const draft = planDraft({ startDate: '2026-10-05', endDate: '2026-11-29' });
   assert.deepEqual(planFailures(draft as any, request, 45), []);
 });
 
