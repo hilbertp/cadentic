@@ -123,6 +123,13 @@ data class OnboardingDraft(
     val focusCount: Int = DEFAULT_FOCUS_COUNT,
     val lane: Lane = Lane.LONGEVITY,
     val injuries: List<String> = listOf("Lower-back disc (L4/L5)", "Right ankle instability"),
+    /**
+     * Optional athlete ceiling (owner decision, 2026-08-30): the most days per week that may
+     * carry effort of any kind — planned training AND commitments like games or practices,
+     * counted as distinct days. The coach prescribes the frequency; this only caps it.
+     * null = no cap, which is the default and stays one tap away from being the answer.
+     */
+    val maxWeeklyDays: Int? = null,
     val constraints: Constraints,
     /** The generated cycle, once the engine has returned one. Persisted only at approval. */
     val plan: com.cadentic.app.domain.artifacts.MesocyclePlanArtifact? = null,

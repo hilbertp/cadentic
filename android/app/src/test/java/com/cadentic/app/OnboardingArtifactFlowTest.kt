@@ -168,6 +168,45 @@ class OnboardingArtifactFlowTest {
         assertEquals(listOf(Category.STRENGTH), summary.queuedForLater)
     }
 
+    // --- The weekly ceiling (owner decision, 2026-08-30) ---------------------
+
+    @Test
+    fun `the ceiling is optional, survives a restart, and null means no cap`() =
+        runTest(mainDispatcher.dispatcher) {
+            val vm = launchApp()
+            vm.setMaxWeeklyDays(4)
+            vm.continueFromStep(1)
+            vm.continueFromStep(2)
+
+            assertEquals(4, repository().readGoals()!!.maxWeeklyDays)
+
+            Restart.simulate()
+            val relaunched = launchApp()
+            assertEquals(4, relaunched.draft.maxWeeklyDays)
+
+            // Clearing it is a real answer, not a missing one — and it persists too.
+            relaunched.setMaxWeeklyDays(null)
+            relaunched.continueFromStep(1)
+            assertNull(repository().readGoals()!!.maxWeeklyDays)
+
+            Restart.simulate()
+            assertNull(launchApp().draft.maxWeeklyDays)
+        }
+
+    @Test
+    fun `the ceiling reaches the meso-request payload`() = runTest(mainDispatcher.dispatcher) {
+        val vm = launchApp()
+        vm.setMaxWeeklyDays(5)
+        vm.continueFromStep(1)
+        vm.continueFromStep(2)
+        vm.continueFromStep(3)
+        advanceUntilIdle()
+
+        val payload = (com.cadentic.app.domain.artifacts.MesoRequestAssembler(repository())
+            .assemble(TODAY) as com.cadentic.app.domain.artifacts.MesoRequestResult.Ok).payload
+        assertEquals(5, payload.goals.maxWeeklyDays)
+    }
+
     // --- Story 3: the lock ---------------------------------------------------
 
     @Test

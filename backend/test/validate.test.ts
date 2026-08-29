@@ -16,6 +16,9 @@ const request = {
   queuedForLater: ['STRENGTH'],
   hardBlockerDates: [] as string[],
   hardBlockerDays: [] as string[],
+  maxWeeklyDays: null as number | null,
+  allBlockerDates: [] as string[],
+  allBlockerDays: [] as string[],
 };
 
 const failuresFor = (over: Record<string, unknown>) =>
@@ -178,6 +181,79 @@ test('a HARD recurring commitment blocks that weekday every week', () => {
   // Every non-deload week has a HARD Friday; the deload week was already downgraded.
   assert.equal(failures.length, 7);
   assert.ok(failures.every((f) => f.includes('FRIDAY')));
+});
+
+// --- The athlete's weekly ceiling (owner decision, 2026-08-30) --------------
+
+test('the ceiling counts commitments, not just training days', () => {
+  // The fixture trains 5 days; a Sunday practice makes 6 occupied days against a cap of 5.
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, maxWeeklyDays: 5, allBlockerDays: ['SUNDAY'] },
+    14,
+  );
+  assert.ok(
+    failures.some((f) => f.includes("ceiling is 5") && f.includes('6 days')),
+    failures.join('; '),
+  );
+});
+
+test('a day carrying both training and a commitment counts once', () => {
+  // Tue/Thu practice lands on days that already train: still 5 occupied days, cap 5 holds.
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, maxWeeklyDays: 5, allBlockerDays: ['TUESDAY', 'THURSDAY'] },
+    14,
+  );
+  assert.deepEqual(failures, []);
+});
+
+test('weeks whose commitments alone exceed the ceiling are exempt', () => {
+  // Three committed days against a cap of 2: the athlete's own calendar never makes the cap
+  // infeasible. The plan trains only on those committed days, adding nothing — accepted.
+  const draft: any = planDraft({ sessionsPerWeek: 3 });
+  const training = new Set(['MONDAY', 'TUESDAY', 'THURSDAY']);
+  for (const wk of draft.weeklyStructure) {
+    wk.days = wk.days.map((d: any) =>
+      training.has(d.day)
+        ? { ...d, type: 'STRENGTH', intensity: 'MEDIUM' }
+        : { ...d, type: 'REST', intensity: null },
+    );
+  }
+  const failures = planFailures(
+    draft,
+    { ...request, maxWeeklyDays: 2, allBlockerDays: ['MONDAY', 'TUESDAY', 'THURSDAY'] },
+    14,
+  );
+  assert.deepEqual(failures, []);
+});
+
+test('but even an exempt week may not add a free day beyond the commitments', () => {
+  const draft: any = planDraft({ sessionsPerWeek: 4 });
+  const training = new Set(['MONDAY', 'TUESDAY', 'THURSDAY', 'SATURDAY']); // SAT is a free day
+  for (const wk of draft.weeklyStructure) {
+    wk.days = wk.days.map((d: any) =>
+      training.has(d.day)
+        ? { ...d, type: 'STRENGTH', intensity: 'MEDIUM' }
+        : { ...d, type: 'REST', intensity: null },
+    );
+  }
+  const failures = planFailures(
+    draft,
+    { ...request, maxWeeklyDays: 2, allBlockerDays: ['MONDAY', 'TUESDAY', 'THURSDAY'] },
+    14,
+  );
+  assert.ok(failures.some((f) => f.includes('ceiling is 2')), failures.join('; '));
+});
+
+test('no ceiling set, no ceiling enforced', () => {
+  // The default request carries null; a crowded week is the coach's call.
+  const failures = planFailures(
+    planDraft() as any,
+    { ...request, allBlockerDays: ['SUNDAY', 'WEDNESDAY'] },
+    14,
+  );
+  assert.deepEqual(failures, []);
 });
 
 // --- Cross-request layer ---------------------------------------------------

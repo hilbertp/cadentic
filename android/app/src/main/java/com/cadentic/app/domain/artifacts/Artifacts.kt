@@ -85,6 +85,13 @@ data class AthleteGoalsArtifact(
     val focusCount: Int,
     /** "Don't care" categories. A goals exclusion — an excluded category may still be rated. */
     val excluded: List<Category>,
+    /**
+     * Optional athlete ceiling on days per week that may carry effort, commitments included
+     * (owner decision, 2026-08-30). A goals trade-off, so it lives here and locks with the
+     * cycle. Additive with a null default, so v2 documents written before it decode as "no
+     * cap" — which is what not having been asked meant.
+     */
+    val maxWeeklyDays: Int? = null,
     val lockedForCycle: GoalsLock? = null,
 ) {
     val isLocked: Boolean get() = lockedForCycle != null

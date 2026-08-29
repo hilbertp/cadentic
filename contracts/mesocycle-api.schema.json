@@ -99,6 +99,10 @@
               "items": { "$ref": "#/$defs/Category" },
               "maxItems": 4,
               "uniqueItems": true
+            },
+            "maxWeeklyDays": {
+              "description": "Optional athlete ceiling (2026-08-30, owner decision): the most days per week that may carry effort of any kind — planned training AND commitments like games or team practice, counted as distinct days, a day carrying both counting once. null means the athlete set no cap. The coach prescribes frequency; this only caps it. Weeks whose commitments alone already exceed the cap are exempt — the athlete's own calendar never makes the cap infeasible, it only stops the plan adding occupied days beyond it.",
+              "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 7 }, { "type": "null" }]
             }
           }
         },

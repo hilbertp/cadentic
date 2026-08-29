@@ -45,6 +45,15 @@ export interface RequestGoals {
    */
   hardBlockerDates: string[];
   hardBlockerDays: string[];
+  /**
+   * The athlete's optional weekly ceiling (owner decision, 2026-08-30): the most days per
+   * week that may carry effort of any kind. Commitments count too, so the full blocker set
+   * rides along — a day is "occupied" when it holds a non-REST training day OR any blocker,
+   * and a day holding both counts once.
+   */
+  maxWeeklyDays: number | null;
+  allBlockerDates: string[];
+  allBlockerDays: string[];
 }
 
 const WEEK = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -213,6 +222,34 @@ export function planFailures(
             `week ${wk.week} ${d.day} (${date}) is a HARD training day, but the athlete already has a HARD commitment that day — plan REST, RECOVERY, or light work around it`,
           );
         }
+      }
+    });
+  }
+
+  // The athlete's weekly ceiling (optional). The coach prescribes frequency; this caps it.
+  // A week's occupied days = distinct days carrying a non-REST training day OR any blocker —
+  // a day carrying both counts once, which is exactly why stacking light training onto an
+  // already-committed day is the cap-respecting move. Weeks whose commitments alone exceed
+  // the cap are exempt: the athlete's own calendar never makes the cap infeasible, it only
+  // stops the plan from adding occupied days beyond it.
+  if (startDow === 1 && request.maxWeeklyDays != null) {
+    const cap = request.maxWeeklyDays;
+    const blockerDates = new Set(request.allBlockerDates);
+    const blockerDows = new Set(request.allBlockerDays);
+    plan.weeklyStructure.forEach((wk, wi) => {
+      let occupied = 0;
+      let commitments = 0;
+      for (let di = 0; di < WEEK.length; di += 1) {
+        const date = isoDate(parseDate(plan.startDate) + (wi * 7 + di) * MS_PER_DAY);
+        const committed = blockerDates.has(date) || blockerDows.has(WEEK[di]);
+        const trains = wk.days.some((d) => d.day === WEEK[di] && d.type !== 'REST');
+        if (committed) commitments += 1;
+        if (committed || trains) occupied += 1;
+      }
+      if (occupied > Math.max(cap, commitments)) {
+        out.push(
+          `week ${wk.week} occupies ${occupied} days with training or commitments, but the athlete's ceiling is ${cap} — rest the free days, or place training on already-committed days (a day carrying both counts once)`,
+        );
       }
     });
   }

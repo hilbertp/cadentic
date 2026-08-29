@@ -63,6 +63,8 @@ data class MesoRequestPayload(
         val focusThisCycle: List<Category>,
         val queuedForLater: List<Category>,
         val excluded: List<Category>,
+        /** Optional athlete ceiling on occupied days per week, commitments included. */
+        val maxWeeklyDays: Int? = null,
     )
 
     @Serializable
@@ -140,6 +142,7 @@ class MesoRequestAssembler(private val repository: ArtifactRepository) {
                 focusThisCycle = goals.priorities.take(goals.focusCount),
                 queuedForLater = goals.priorities.drop(goals.focusCount),
                 excluded = goals.excluded,
+                maxWeeklyDays = goals.maxWeeklyDays,
             ),
             status = MesoRequestPayload.StatusSection(
                 experience = status.experience,
@@ -222,6 +225,9 @@ private fun AthleteGoalsArtifact.validate(): List<ArtifactError> {
             if (focusCount !in 1..ceiling) {
                 add(ArtifactError.InvalidField(id, "focusCount", "$focusCount is not 1..$ceiling"))
             }
+        }
+        maxWeeklyDays?.let {
+            if (it !in 1..7) add(ArtifactError.InvalidField(id, "maxWeeklyDays", "$it is not 1..7"))
         }
     }
 }

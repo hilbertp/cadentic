@@ -33,8 +33,13 @@ import { enumValues, planDraftSchema } from './contract.js';
  * commitment — were being delivered by the model unprompted in every live plan, which made
  * them exactly what this codebase refuses to leave prompt-hoped. Now stated here and
  * enforced by the validator.
+ *
+ * v4 (2026-08-30): the athlete's optional weekly ceiling (`goals.maxWeeklyDays`). The coach
+ * prescribes frequency; the athlete may cap the days per week that carry effort of any kind,
+ * commitments included. Stated with its counting rule — a day holding both training and a
+ * commitment counts once — and enforced by the validator per week.
  */
-export const PROMPT_VERSION = 3;
+export const PROMPT_VERSION = 4;
 
 const list = (name: string) => enumValues(name).join(' | ');
 
@@ -82,6 +87,13 @@ const RULES = `
 - **progression** — \`intraWeek\` describes how load moves across the days of a week;
   \`interWeek\` describes how it moves from week to week across the cycle. Plain prose, one
   short paragraph each. These are the only free-text fields in the response.
+- **goals.maxWeeklyDays** — if non-null, the athlete's hard ceiling on how many days per
+  week may carry effort of *any* kind: planned training days and commitment days from
+  \`blockerCalendar\` both count, as **distinct days** — a day holding both a commitment and
+  a training session counts once. You prescribe the frequency; this only caps it. When the
+  calendar is crowded, place lighter sessions on already-committed days rather than spending
+  a free day. A week whose commitments alone already exceed the ceiling is exempt from it —
+  but add no occupied day beyond them.
 - **lane, focus, queued** — echo \`goals.lane\`, \`goals.focusThisCycle\` and
   \`goals.queuedForLater\` from the payload back unchanged. They are stated so a mismatch is
   visible; the backend uses the payload's own values regardless.

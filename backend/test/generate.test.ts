@@ -46,6 +46,13 @@ test('the prompt tells the model why phase names must be short', async () => {
   assert.ok(provider.prompts[0].includes('One or two short words'));
 });
 
+test('the prompt explains the weekly ceiling and its counting rule', async () => {
+  const provider = new FakeProvider([{ value: planDraft() }]);
+  await run(provider);
+  assert.ok(provider.prompts[0].includes('maxWeeklyDays'));
+  assert.ok(provider.prompts[0].includes('counts once'));
+});
+
 test('the prompt states no duration band while the owner question is open', async () => {
   const provider = new FakeProvider([{ value: planDraft() }]);
   await run(provider);

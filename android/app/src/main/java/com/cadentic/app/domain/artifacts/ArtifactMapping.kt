@@ -72,6 +72,7 @@ fun OnboardingDraft.toGoalsArtifact(now: Instant, lock: GoalsLock? = null): Athl
         // impossible state and must not be expressible in an artifact or a payload.
         focusCount = effectiveFocusCount,
         excluded = Category.entries.filter { profile.assessment[it]?.dontCare == true },
+        maxWeeklyDays = maxWeeklyDays,
         lockedForCycle = lock,
     )
 
@@ -154,6 +155,9 @@ fun hydrateDraft(
         priorities = goals?.priorities ?: fallback.priorities,
         focusCount = goals?.focusCount ?: fallback.focusCount,
         lane = goals?.lane ?: fallback.lane,
+        // The ceiling follows the goals artifact wholesale: if goals were persisted, its
+        // value — null included — is the athlete's answer, not a gap to fall back through.
+        maxWeeklyDays = if (goals != null) goals.maxWeeklyDays else fallback.maxWeeklyDays,
         injuries = status?.injuries ?: fallback.injuries,
         constraints = calendar?.toConstraints() ?: fallback.constraints,
     )

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -144,6 +145,15 @@ fun BlockersScreen(vm: OnboardingViewModel) {
                 Text("+ Add one-off or recurring", style = sans(13.5.sp, FontWeight.Medium, color = Ink.secondary))
             }
         }
+
+        SectionLabel("Weekly ceiling — optional", Modifier.padding(top = 16.dp, bottom = 8.dp), size = 10.5.sp, tracking = 1.4.sp)
+        WeeklyCeilingRow(selected = draft.maxWeeklyDays, onSelect = vm::setMaxWeeklyDays)
+        Text(
+            "The most days a week that may cost effort — games and practices count too. " +
+                "The coach decides how many to actually use.",
+            style = sans(12.sp, lineHeight = 12.sp * 1.5f, color = Ink.secondary),
+            modifier = Modifier.padding(top = 9.dp),
+        )
     }
 
     // Resolve by id at render time so a sheet never edits a stale copy.
@@ -682,5 +692,43 @@ private fun SheetTextField(value: String, placeholder: String = "", onChange: (S
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+
+/**
+ * The athlete's optional cap on occupied days per week (owner decision, 2026-08-30). "No cap"
+ * is a first-class choice and the default — the coach prescribes frequency; this only bounds
+ * it. Styled after the step-1 pickers: same pill, same selected treatment.
+ */
+@Composable
+private fun WeeklyCeilingRow(selected: Int?, onSelect: (Int?) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CeilingChip(label = "No cap", isSelected = selected == null, weight = 1.6f) { onSelect(null) }
+        for (n in 3..6) {
+            CeilingChip(label = "$n", isSelected = selected == n, weight = 1f) { onSelect(n) }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.CeilingChip(label: String, isSelected: Boolean, weight: Float, onClick: () -> Unit) {
+    Box(
+        Modifier.weight(weight)
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (isSelected) Ink.accentTint else Ink.surface)
+            .then(
+                if (isSelected) Modifier.border(1.5.dp, Ink.accent, RoundedCornerShape(11.dp))
+                else Modifier.border(1.dp, Ink.hairline, RoundedCornerShape(11.dp))
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = if (isSelected) sans(13.5.sp, FontWeight.SemiBold, color = Ink.accentDeep)
+            else sans(13.5.sp, color = Ink.secondary),
+        )
     }
 }

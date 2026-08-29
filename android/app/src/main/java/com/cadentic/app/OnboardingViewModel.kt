@@ -210,6 +210,9 @@ class OnboardingViewModel(
     fun setFocusCount(n: Int) = update { copy(focusCount = n.coerceIn(1, MAX_FOCUS_COUNT)) }
 
     fun setLane(lane: Lane) = update { copy(lane = lane) }
+
+    /** null clears the cap. Captured on step 3, but a goals fact — it locks with the cycle. */
+    fun setMaxWeeklyDays(days: Int?) = update { copy(maxWeeklyDays = days?.coerceIn(1, 7)) }
     fun addInjury(text: String) {
         val t = text.trim()
         if (t.isNotEmpty()) update { copy(injuries = injuries + t) }

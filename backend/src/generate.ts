@@ -42,6 +42,9 @@ export async function generatePlan(input: GenerateInput): Promise<MesocyclePlan>
     hardBlockerDays: (payload.blockerCalendar?.recurring ?? [])
       .filter((r: any) => r.strain === 'HARD')
       .flatMap((r: any) => r.days),
+    maxWeeklyDays: payload.goals.maxWeeklyDays ?? null,
+    allBlockerDates: (payload.blockerCalendar?.oneOffs ?? []).map((o: any) => o.date),
+    allBlockerDays: (payload.blockerCalendar?.recurring ?? []).flatMap((r: any) => r.days),
   };
 
   const basePrompt = buildPrompt({ payload, startDateWindowDays });
